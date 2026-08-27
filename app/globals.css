@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --color-cream: #f6ecc9;
+  --color-panel: #ffffff;
+  --color-panel-2: #ece4cc;
+  --color-border: #ece4cc;
+  --color-border-strong: #d8cbaa;
+  --color-moss: #5e7a3b;
+  --color-teal: #2f8478;
+  --color-rose: #c24f3d;
+  --color-sun: #f4c84e;
+  --color-ink: #2b2a1f;
+  --color-fg: #2b2a1f;
+  --color-fg-muted: #8a8064;
+}
+
+@theme inline {
+  --color-cream: var(--color-cream);
+  --color-panel: var(--color-panel);
+  --color-panel-2: var(--color-panel-2);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-moss: var(--color-moss);
+  --color-teal: var(--color-teal);
+  --color-rose: var(--color-rose);
+  --color-sun: var(--color-sun);
+  --color-ink: var(--color-ink);
+  --color-fg: var(--color-fg);
+  --color-fg-muted: var(--color-fg-muted);
+
+  --font-heading: var(--font-space-grotesk);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-plex-mono);
+  --font-hand: var(--font-caveat);
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--color-moss);
+  color: #ffffff;
+}
+
+* {
+  scrollbar-color: var(--color-border-strong) var(--color-cream);
+}

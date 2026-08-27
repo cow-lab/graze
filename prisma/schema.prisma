@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum PostType {
+  POST
+  RESEARCH
+}
+
+enum VoteValue {
+  UP
+  DOWN
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// Where a post came from: a person submitting it through /submit, or The Combine
+// (the automated research-ingestion pipeline) surfacing it from an academic API.
+enum PostSource {
+  USER
+  COMBINE
+}
+
+// Moderation state. USER-sourced posts publish immediately; COMBINE-sourced posts
+// land as PENDING and only become publicly visible once an admin approves them
+// on /admin/queue.
+enum PostStatus {
+  PENDING
+  PUBLISHED
+  REJECTED
+}
+
+// Spam defense for Fields is traction-based, not a review queue: every new Field (whether
+// a user created it or The Combine suggested it) starts PROVISIONAL — listed in a small
+// "New fields" section, not the main sidebar. It's promoted to ACTIVE automatically once
+// posts from a few distinct users land in it (see maybePromoteField in lib/actions/fields.ts),
+// or an admin can promote/suspend it directly from /admin/fields. A spam Field just never
+// earns traction and stays out of the way — nobody has to manually reject it.
+enum FieldStatus {
+  PROVISIONAL
+  ACTIVE
+  SUSPENDED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  name          String
+  verified      Boolean  @default(false)
+  role          UserRole @default(USER)
+  createdAt     DateTime @default(now())
+
+  // Random 4-digit number assigned the first time this user posts anonymously, then
+  // reused for every anonymous post/comment they make — lets others follow one
+  // anonymous contributor's activity without it ever linking back to their real profile.
+  cowNumber        Int?    @unique
+  websiteUrl       String?
+  linkedinUrl      String?
+  googleScholarUrl String?
+  githubUrl        String?
+
+  posts         Post[]
+  comments      Comment[]
+  votes         Vote[]
+  commentVotes  CommentVote[]
+  createdBoards Board[]       @relation("BoardCreator")
+  affiliations  Affiliation[]
+  fieldReports  FieldReport[]
+}
+
+// A role/institution a user has listed on their profile — e.g. "PhD Candidate, MIT".
+// A user can have several (a professor consulting for a startup, for instance). Each is
+// verified independently: `verified` is true only when `email`'s domain is a matching
+// .edu or institutional company domain, mirroring the same domain heuristic used
+// elsewhere in the app (see lib/verification.ts) rather than a live email round-trip,
+// since no SMTP provider is configured. Unverified affiliations are still shown, just
+// without the checkmark.
+model Affiliation {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  institution String
+  email       String
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Board {
+  id                 String      @id @default(cuid())
+  slug               String      @unique
+  name               String
+  description        String
+  // JSON-encoded string[] — the keywords The Combine uses to query Crossref/OpenAlex/etc
+  // for this Field. Stored as JSON text rather than a native array since SQLite has no
+  // array column type.
+  searchKeywordsJson String      @default("[]")
+  status             FieldStatus @default(PROVISIONAL)
+  // True when The Combine proposed this Field itself (a cluster of papers didn't match any
+  // existing Field well) rather than a person creating it. Still goes through the same
+  // provisional → active flow — nothing AI-suggested publishes straight to the sidebar.
+  isAiSuggested      Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+
+  createdById String?
+  createdBy   User?         @relation("BoardCreator", fields: [createdById], references: [id])
+
+  posts       Post[]
+  reports     FieldReport[]
+}
+
+// A "report this Field" flag — the backstop behind the traction-based promotion system,
+// for anything that slips through. Reviewed by an admin at /admin/fields; reporting doesn't
+// change the Field's status by itself.
+model FieldReport {
+  id         String   @id @default(cuid())
+  boardId    String
+  board      Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  reporterId String
+  reporter   User     @relation(fields: [reporterId], references: [id])
+  reason     String
+  createdAt  DateTime @default(now())
+
+  @@index([boardId])
+}
+
+model Post {
+  id          String     @id @default(cuid())
+  type        PostType
+  title       String
+  createdAt   DateTime   @default(now())
+
+  authorId    String
+  author      User       @relation(fields: [authorId], references: [id])
+  boardId     String
+  board       Board      @relation(fields: [boardId], references: [id])
+
+  // authorId always points at the real account — anonymity is purely a display-layer
+  // choice (render as "Cow #XXXX" instead of the author's name/affiliations), never a
+  // missing/faked author. Needed so the poster can still be moderated and can still
+  // manage their own anonymous posts from their real account.
+  isAnonymous Boolean    @default(false)
+
+  source      PostSource @default(USER)
+  // Which API surfaced this (e.g. "Crossref", "OpenAlex", "Semantic Scholar", "PubMed") —
+  // set only when source is COMBINE, shown as an "auto-imported from X" badge.
+  sourceName  String?
+  status      PostStatus @default(PUBLISHED)
+  // DOI, when known — the dedup key The Combine uses to avoid importing the same paper twice.
+  doi         String?    @unique
+
+  // Community post fields — a question, analysis, project, or discussion
+  description String?
+
+  // Research fields
+  authors     String?
+  field       String?
+  year        Int?
+  abstract    String?
+  externalUrl String?
+  fileUrl     String?
+  viewCount   Int        @default(0)
+  // From Crossref/OpenAlex/Semantic Scholar at import time — the real credibility signal
+  // now that account-level verification isn't in play for research. Null for a
+  // user-submitted paper nobody has cross-referenced yet.
+  citationCount Int?
+  // Set by the periodic Crossref retraction re-sync (lib/combine/retractions.ts) if a
+  // previously-imported paper turns out to have been retracted. Null means "not retracted
+  // as of the last check," not "guaranteed never retracted."
+  retractedAt   DateTime?
+
+  // Optional link from a community post to the research post it's discussing/responding to
+  refPostId        String?
+  refPost          Post?  @relation("PostRef", fields: [refPostId], references: [id])
+  referencingPosts Post[] @relation("PostRef")
+
+  comments    Comment[]
+  votes       Vote[]
+  explainer   ResearchExplainer?
+
+  @@index([boardId])
+  @@index([type])
+  @@index([status])
+}
+
+// A journal/publisher known to be legitimate peer-reviewed open access — the validity
+// filter The Combine checks candidate articles against before they're eligible for import.
+// Populated both by seeding a small curated set and by caching live DOAJ lookups.
+model AllowlistJournal {
+  id        String   @id @default(cuid())
+  issn      String   @unique
+  name      String
+  publisher String?
+  source    String // "DOAJ" | "CURATED"
+  createdAt DateTime @default(now())
+}
+
+// Read-through cache for Crossref/OpenAlex/Semantic Scholar search responses, keyed by
+// source + the keyword query used. Re-running The Combine (e.g. a daily job) on the same
+// Field within the TTL window reuses the cached result set instead of re-fetching — the
+// actual cost-control lever, since these are the highest-volume calls Combine makes.
+model ApiResponseCache {
+  id           String   @id @default(cuid())
+  source       String
+  queryKey     String
+  responseJson String
+  fetchedAt    DateTime @default(now())
+
+  @@unique([source, queryKey])
+}
+
+model ResearchExplainer {
+  id         String   @id @default(cuid())
+  postId     String   @unique
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  summary    String
+  termsJson  String
+  quizJson   String
+  isDemo     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  body        String
+  isAnonymous Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  postId    String
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id])
+
+  parentId  String?
+  parent    Comment?  @relation("Replies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   Comment[] @relation("Replies")
+
+  votes     CommentVote[]
+
+  @@index([postId])
+}
+
+model Vote {
+  id        String    @id @default(cuid())
+  value     VoteValue
+  createdAt DateTime  @default(now())
+
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  postId    String
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+
+model CommentVote {
+  id        String    @id @default(cuid())
+  value     VoteValue
+  createdAt DateTime  @default(now())
+
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  commentId String
+  comment   Comment   @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+}
