@@ -31,9 +31,17 @@ const FRAMES = {
 export default function FieldScene({
   variant = "full",
   className = "",
+  showCow = true,
 }: {
   variant?: keyof typeof FRAMES;
   className?: string;
+  /**
+   * The cow's drawing extends ~68 units above its origin at y=205, so any crop that shows
+   * the hills also catches the top of the cow. On inner pages the first content panel then
+   * lands across it and slices it in half, which reads as a broken image. Those pages opt
+   * out and keep the landscape; the homepage frames the cow deliberately.
+   */
+  showCow?: boolean;
 }) {
   const frame = FRAMES[variant];
   // The horizon crop starts just above the hilltops, which puts the bottom edge of the sun
@@ -145,7 +153,7 @@ export default function FieldScene({
           that sit on the head. Positioned to stay clear of the sun, the logo, and the
           translucent header's footprint at every viewport width. */}
       {/* the grazing cow — see components/CowDoodle.tsx */}
-      <CowDoodle transform="translate(610,205) rotate(-1.5)" />
+      {showCow && <CowDoodle transform="translate(610,205) rotate(-1.5)" />}
 
       {/* whimsical hand-doodled flowers along the horizon */}
       {FLOWER_POSITIONS.map(([fx, fy], i) => (

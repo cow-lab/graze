@@ -16,6 +16,7 @@ import FieldPicker, { type PickerSuggestion } from "@/components/FieldPicker";
 import FieldTested from "@/components/FieldTested";
 import type { Assessment } from "@/lib/credibility/assess";
 import type { LiveSearchResult } from "@/lib/liveSearch";
+import { buttonClass } from "@/lib/controls";
 
 type Board = { slug: string; name: string };
 
@@ -217,7 +218,7 @@ function ResultRow({
             type="button"
             onClick={handleAdd}
             disabled={isPending || selectedSlugs.length === 0}
-            className="mt-2.5 inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-moss text-white text-xs font-medium hover:brightness-110 transition disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
+            className={buttonClass("primary", "sm", "mt-2.5")}
           >
             <Plus size={12} aria-hidden="true" />{" "}
             {isPending

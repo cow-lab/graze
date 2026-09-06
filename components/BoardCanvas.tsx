@@ -15,6 +15,7 @@ import {
   deleteLink,
 } from "@/lib/actions/board";
 import { CARD_WIDTH, CARD_HEIGHT, type BoardCard, type BoardLink } from "@/lib/board";
+import { buttonClass } from "@/lib/controls";
 
 // The connection labels worth offering as one click. Anything else is typed — the label is
 // the user's reading of the relationship, so the presets are a shortcut, not a taxonomy.
@@ -838,7 +839,7 @@ function LinkLabelForm({
         />
         <button
           type="submit"
-          className="rounded-md bg-moss px-3 py-1.5 text-sm font-medium text-white hover:brightness-110 transition"
+          className={buttonClass("primary")}
         >
           Connect
         </button>

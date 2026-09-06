@@ -3,6 +3,7 @@ import { signOutAction } from "@/lib/actions/auth";
 import MobileNav from "@/components/MobileNav";
 import type { SessionUser } from "@/lib/session";
 import NotificationBell, { type NotificationItem } from "@/components/NotificationBell";
+import { buttonClass } from "@/lib/controls";
 
 export default function Header({
   user,
@@ -41,7 +42,7 @@ export default function Header({
         <div className="hidden sm:flex items-center gap-3">
           <Link
             href="/submit"
-            className="px-3 py-1.5 rounded-md bg-moss text-white text-sm font-medium hover:brightness-110 transition"
+            className={buttonClass("primary")}
           >
             Submit
           </Link>

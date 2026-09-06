@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { approveQueueEntry, rejectQueueEntry } from "@/lib/actions/admin";
 import InlineError from "@/components/InlineError";
 import type { ActionResult } from "@/lib/actions/result";
+import { buttonClass } from "@/lib/controls";
 
 export default function QueueActions({ postId }: { postId: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,7 @@ export default function QueueActions({ postId }: { postId: string }) {
         type="button"
         disabled={isPending}
         onClick={() => run(() => approveQueueEntry(postId))}
-        className="px-3 py-1.5 rounded-md bg-moss text-white text-xs font-medium hover:brightness-110 transition disabled:opacity-60"
+        className={buttonClass("primary", "sm")}
       >
         Approve
       </button>

@@ -5,6 +5,7 @@ import { getBoardedPostIds } from "@/lib/board";
 import ResearchCard from "@/components/ResearchCard";
 import { tabClass } from "@/lib/tabStyles";
 import EmptyState from "@/components/EmptyState";
+import { buttonClass } from "@/lib/controls";
 
 const SORT_TABS: SortOption[] = ["cited", "discussed", "new"];
 
@@ -31,7 +32,7 @@ export default async function ResearchLibraryPage({
           <h1 className="font-heading text-2xl font-semibold">Research library</h1>
           <Link
             href="/submit"
-            className="px-3 py-1.5 rounded-md bg-teal text-white text-sm font-medium hover:brightness-110 transition"
+            className={buttonClass("primary")}
           >
             Submit a paper
           </Link>
@@ -60,7 +61,7 @@ export default async function ResearchLibraryPage({
           {sort !== DEFAULT_SORT && <input type="hidden" name="sort" value={sort} />}
           <button
             type="submit"
-            className="px-4 py-2 rounded-md bg-panel-2 border border-border text-sm text-fg hover:border-moss transition"
+            className={buttonClass("quiet")}
           >
             Filter
           </button>

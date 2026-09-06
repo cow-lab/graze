@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { createComment } from "@/lib/actions/comments";
+import { buttonClass } from "@/lib/controls";
 
 export default function CommentForm({
   postId,
@@ -51,7 +52,7 @@ export default function CommentForm({
         <button
           type="submit"
           disabled={pending}
-          className="px-3 py-1.5 rounded-md bg-moss text-white text-xs font-medium hover:brightness-110 transition disabled:opacity-60"
+          className={buttonClass("primary", "sm")}
         >
           {pending ? "Posting…" : parentId ? "Reply" : "Comment"}
         </button>

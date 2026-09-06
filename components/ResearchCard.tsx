@@ -27,7 +27,7 @@ export default function ResearchCard({
   return (
     // Same overlay-link pattern as PostCard: jargon terms are buttons and can't live
     // inside an <a>, so the link covers the card instead of wrapping the content.
-    <div className="relative flex gap-3 bg-panel/95 border border-border-strong rounded-lg px-4 py-3 shadow-sm hover:border-moss/50 transition">
+    <div className="relative flex gap-3 rounded-lg border border-border-strong bg-panel px-4 py-3.5 shadow-sm transition hover:border-moss/60 hover:shadow-md">
       <Link
         href={`/post/${post.id}`}
         className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
@@ -35,7 +35,7 @@ export default function ResearchCard({
         <span className="sr-only">{post.title}</span>
       </Link>
 
-      <div className="relative z-10">
+      <div className="relative z-10 pt-0.5">
         <VoteButtons
           postId={post.id}
           score={post.score}
@@ -64,10 +64,10 @@ export default function ResearchCard({
           />
           <LanguageBadge code={post.language} />
         </div>
-        <h3 className="font-heading text-base font-semibold leading-snug text-ink">
+        <h3 className="font-heading text-[15px] font-semibold leading-snug text-ink">
           <JargonText text={post.title} terms={terms} />
         </h3>
-        <p className="text-sm text-fg-muted mt-0.5">
+        <p className="mt-1 text-[13px] leading-relaxed text-fg-muted">
           {formatAuthors(post.authors)} · {post.field} · {post.year}
           {post.citationCount != null && (
             <>
@@ -79,22 +79,27 @@ export default function ResearchCard({
           )}
         </p>
         {post.explainer?.tldr && (
-          <p className="mt-2 flex items-start gap-1.5 text-sm text-fg">
+          <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-relaxed text-fg">
             <Sparkles size={13} className="mt-0.5 shrink-0 text-teal" aria-hidden="true" />
             <span className="line-clamp-2">{post.explainer.tldr}</span>
           </p>
         )}
 
-        <div className="relative z-10 mt-2.5 w-fit">
+        <div className="relative z-10 mt-3 flex w-fit flex-wrap items-center gap-2">
           <ChewButton
             postId={post.id}
             paper={{ postId: post.id, doi: post.doi }}
             sourceUrl={post.externalUrl ?? post.fileUrl}
             language={post.language}
           />
+          <AddToBoardButton
+            postId={post.id}
+            initialOnBoard={isOnBoard}
+            isLoggedIn={isLoggedIn}
+          />
         </div>
 
-        <div className="flex items-center gap-3 mt-2 font-mono text-[11px] text-fg-muted flex-wrap">
+        <div className="relative z-10 mt-2.5 flex w-fit flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-fg-muted">
           <AuthorDisplay
             userId={post.author.id}
             name={post.author.name}
@@ -102,16 +107,9 @@ export default function ResearchCard({
             cowNumber={post.author.cowNumber}
             linkToProfile={false}
           />
-          <span>·</span>
-          <AddToBoardButton
-            postId={post.id}
-            initialOnBoard={isOnBoard}
-            isLoggedIn={isLoggedIn}
-            compact
-          />
-          <span>·</span>
+          <span aria-hidden="true">·</span>
           <span>{plural(post.viewCount, "view")}</span>
-          <span>·</span>
+          <span aria-hidden="true">·</span>
           <FieldChips fields={post.fields} />
         </div>
       </div>

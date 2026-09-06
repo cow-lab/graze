@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { buttonClass } from "@/lib/controls";
 
 type Field = {
   name: string;
@@ -58,7 +59,7 @@ export default function AuthForm({
           <button
             type="submit"
             disabled={pending}
-            className="mt-2 px-4 py-2 rounded-md bg-moss text-white text-sm font-medium hover:brightness-110 transition disabled:opacity-60"
+            className={buttonClass("primary", "md", "mt-2")}
           >
             {pending ? "Please wait…" : submitLabel}
           </button>

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { reportClientError } from "@/lib/actions/errors";
+import { buttonClass } from "@/lib/controls";
 
 export default function RouteError({
   error,
@@ -31,7 +32,7 @@ export default function RouteError({
           <button
             type="button"
             onClick={reset}
-            className="px-4 py-2 rounded-md bg-moss text-white text-sm font-medium hover:brightness-110 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
+            className={buttonClass("primary")}
           >
             Try again
           </button>

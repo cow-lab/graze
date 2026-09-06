@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Merge } from "lucide-react";
 import { mergePostsAction } from "@/lib/actions/admin";
 import InlineError from "@/components/InlineError";
+import { buttonClass } from "@/lib/controls";
 
 export default function MergePostsButton({
   keepPostId,
@@ -37,7 +38,7 @@ export default function MergePostsButton({
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-moss text-white text-xs font-medium hover:brightness-110 transition disabled:opacity-60"
+        className={buttonClass("primary", "sm")}
       >
         <Merge size={12} aria-hidden="true" />
         {isPending ? "Merging…" : "Keep this, merge others in"}

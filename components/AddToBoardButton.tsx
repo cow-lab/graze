@@ -9,6 +9,7 @@ import {
   type ExternalPaper,
 } from "@/lib/actions/board";
 import InlineError from "@/components/InlineError";
+import { buttonClass } from "@/lib/controls";
 
 // Replaces the old bookmark button. Saving a paper isn't a list append any more — it puts
 // a card on the user's board, which is where the note-writing and connecting happens. The
@@ -18,7 +19,6 @@ export default function AddToBoardButton({
   external,
   initialOnBoard,
   isLoggedIn,
-  compact = false,
 }: {
   /** For a paper in the library. */
   postId?: string;
@@ -26,7 +26,6 @@ export default function AddToBoardButton({
   external?: ExternalPaper;
   initialOnBoard: boolean;
   isLoggedIn: boolean;
-  compact?: boolean;
 }) {
   const [onBoard, setOnBoard] = useState(initialOnBoard);
   const [error, setError] = useState<string | null>(null);
@@ -75,22 +74,20 @@ export default function AddToBoardButton({
             ? "On your board — click to remove"
             : "Add a card for this paper to your board"
         }
-        className={`relative z-10 inline-flex items-center gap-1 rounded transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${
-          compact ? "" : "px-2 py-1 border border-border text-xs"
-        } ${onBoard ? "text-moss" : "text-fg-muted hover:text-moss"}`}
+        // Sits beside "Chew on this" on a card, so it takes the shared button geometry and
+        // stays quiet — same size, lower contrast.
+        className={buttonClass(
+          "quiet",
+          "md",
+          `relative z-10 ${onBoard ? "border-moss/60 text-moss" : ""}`,
+        )}
       >
         <StickyNote
-          size={compact ? 14 : 12}
+          size={14}
           fill={onBoard ? "currentColor" : "none"}
           aria-hidden="true"
         />
-        {compact
-          ? onBoard
-            ? "On board"
-            : "Board"
-          : onBoard
-            ? "On your board"
-            : "Add to board"}
+        {onBoard ? "On your board" : "Add to board"}
       </button>
       <InlineError message={error} />
     </span>

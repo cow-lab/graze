@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { Gauge, X } from "lucide-react";
 import { setLowBandwidth } from "@/lib/actions/preferences";
+import { buttonClass } from "@/lib/controls";
 
 const DISMISSED_KEY = "graze_lowbw_suggestion_dismissed";
 
@@ -66,7 +67,7 @@ export default function LowBandwidthSuggestion({ enabled }: { enabled: boolean }
           type="button"
           disabled={isPending}
           onClick={() => startTransition(() => setLowBandwidth(true, { viaSuggestion: true }))}
-          className="px-3 py-1.5 rounded-md bg-moss text-white text-xs font-medium hover:brightness-110 transition disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
+          className={buttonClass("primary", "sm")}
         >
           {isPending ? "Turning on…" : "Turn on"}
         </button>

@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Play, Pause, Square } from "lucide-react";
 import { logListen } from "@/lib/actions/metrics";
+import { buttonClass } from "@/lib/controls";
 
 // Reads the plain-language summary aloud using the browser's built-in speech synthesis.
 // No external service and no API cost — and deliberately scoped to the summary only, so
@@ -71,7 +72,7 @@ export default function ListenButton({ text }: { text: string }) {
         <button
           type="button"
           onClick={start}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border-strong text-xs font-medium text-fg hover:bg-ink/5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
+          className={buttonClass("quiet")}
         >
           <Play size={12} aria-hidden="true" /> Listen
           <span className="sr-only"> to the plain-language summary</span>
@@ -81,7 +82,7 @@ export default function ListenButton({ text }: { text: string }) {
           <button
             type="button"
             onClick={togglePause}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border-strong text-xs font-medium text-fg hover:bg-ink/5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
+            className={buttonClass("quiet")}
           >
             {paused ? (
               <>
@@ -97,7 +98,7 @@ export default function ListenButton({ text }: { text: string }) {
             type="button"
             onClick={stop}
             aria-label="Stop reading"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border-strong text-xs font-medium text-fg-muted hover:text-ink transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
+            className={buttonClass("quiet")}
           >
             <Square size={12} aria-hidden="true" /> Stop
           </button>

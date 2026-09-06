@@ -57,7 +57,7 @@ export default function VoteButtons({
   }
 
   const wrapperClass =
-    orientation === "vertical" ? "flex flex-col items-center gap-0.5" : "flex items-center gap-2";
+    orientation === "vertical" ? "flex flex-col items-center gap-1" : "flex items-center gap-2";
 
   // `aria-pressed` communicates the toggled state, so a screen reader announces whether
   // you've already grown this post rather than just "button, Grow this". The score is
@@ -70,12 +70,12 @@ export default function VoteButtons({
         aria-label="Grow this post"
         aria-pressed={optimisticVote === "UP"}
         title="Grow this"
-        className={`leading-none transition-colors rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${
-          optimisticVote === "UP" ? "text-moss" : "text-fg-muted hover:text-moss"
+        className={`rounded p-1 leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${
+          optimisticVote === "UP" ? "text-moss" : "text-fg-muted hover:bg-moss/10 hover:text-moss"
         }`}
       >
         <Sprout
-          size={16}
+          size={15}
           aria-hidden="true"
           fill={optimisticVote === "UP" ? "currentColor" : "none"}
           strokeWidth={optimisticVote === "UP" ? 2.5 : 2}
@@ -84,7 +84,7 @@ export default function VoteButtons({
       <span
         aria-live="polite"
         aria-atomic="true"
-        className={`text-xs tabular-nums ${
+        className={`text-xs font-medium tabular-nums ${
           optimisticVote === "UP"
             ? "text-moss"
             : optimisticVote === "DOWN"
@@ -100,11 +100,11 @@ export default function VoteButtons({
         onClick={() => handleVote("DOWN")}
         aria-label="Downvote this post"
         aria-pressed={optimisticVote === "DOWN"}
-        className={`leading-none transition-colors rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${
-          optimisticVote === "DOWN" ? "text-rose" : "text-fg-muted hover:text-rose"
+        className={`rounded p-1 leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${
+          optimisticVote === "DOWN" ? "text-rose" : "text-fg-muted hover:bg-rose/10 hover:text-rose"
         }`}
       >
-        <ArrowDown size={16} aria-hidden="true" />
+        <ArrowDown size={15} aria-hidden="true" />
       </button>
       <InlineError message={error} className={orientation === "vertical" ? "w-32 text-center" : ""} />
     </div>

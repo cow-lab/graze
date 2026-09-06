@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { createField } from "@/lib/actions/fields";
+import { buttonClass } from "@/lib/controls";
 
 const inputClass =
   "bg-panel-2 border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-1 focus:ring-moss";
@@ -67,7 +68,7 @@ export default function NewFieldForm() {
         <button
           type="submit"
           disabled={pending}
-          className="px-5 py-2 rounded-md bg-moss text-white text-sm font-medium hover:brightness-110 transition disabled:opacity-60"
+          className={buttonClass("primary")}
         >
           {pending ? "Creating…" : "Create Field"}
         </button>

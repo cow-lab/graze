@@ -8,6 +8,7 @@ import LoadingMessage from "@/components/LoadingMessage";
 import { LOADING_MESSAGES } from "@/lib/loadingMessages";
 import Spinner from "@/components/Spinner";
 import type { CombineRunSummary } from "@/lib/combine/run";
+import { buttonClass } from "@/lib/controls";
 
 export default function RunCombineButton() {
   const [summary, setSummary] = useState<CombineRunSummary | null>(null);
@@ -30,7 +31,7 @@ export default function RunCombineButton() {
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-teal text-white text-sm font-medium hover:brightness-110 transition disabled:opacity-60"
+        className={buttonClass("primary")}
       >
         {isPending ? <Spinner /> : <Sparkles size={14} aria-hidden="true" />}
         {isPending ? "Running The Combine…" : "Run The Combine now"}

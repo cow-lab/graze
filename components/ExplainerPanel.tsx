@@ -6,6 +6,7 @@ import { Sparkles, CheckCircle2, XCircle, X } from "lucide-react";
 import ListenButton from "@/components/ListenButton";
 import RunningCowLoader from "@/components/RunningCowLoader";
 import Portal from "@/components/Portal";
+import { buttonClass } from "@/lib/controls";
 import SourceLink from "@/components/SourceLink";
 import { logChewCurated } from "@/lib/actions/metrics";
 import {
@@ -241,9 +242,9 @@ export default function ExplainerPanel({
         type="button"
         onClick={handleOpen}
         aria-haspopup="dialog"
-        className="inline-flex items-center gap-2 rounded-md bg-teal px-5 py-2.5 text-base font-semibold text-white shadow-sm transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+        className={buttonClass("accent")}
       >
-        <Sparkles size={18} aria-hidden="true" />
+        <Sparkles size={14} aria-hidden="true" />
         Chew on this
         <span className="sr-only">
           {" "}
@@ -353,7 +354,7 @@ export default function ExplainerPanel({
                         <SourceLink
                           href={sourceUrl}
                           paper={paper}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-moss/40 bg-moss/10 text-moss text-xs font-medium hover:brightness-105 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
+                          className={buttonClass("quiet", "md", "border-moss/50 bg-moss/10 text-moss hover:text-moss")}
                         >
                           Read the original paper
                         </SourceLink>
@@ -500,7 +501,7 @@ export default function ExplainerPanel({
                           type="button"
                           onClick={handleSubmit}
                           disabled={!allAnswered}
-                          className="px-4 py-1.5 rounded-md bg-moss text-white text-sm font-medium hover:brightness-110 transition disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
+                          className={buttonClass("primary")}
                         >
                           Check my answers
                         </button>
@@ -508,7 +509,7 @@ export default function ExplainerPanel({
                         <button
                           type="button"
                           onClick={reset}
-                          className="px-4 py-1.5 rounded-md border border-border-strong text-sm font-medium hover:bg-ink/5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
+                          className={buttonClass("quiet")}
                         >
                           Try again
                         </button>
