@@ -4,6 +4,7 @@ import { recordMetric } from "@/lib/metrics";
 import { getCurrentUser } from "@/lib/session";
 import { assignableFields, rankFields } from "@/lib/fieldMatch";
 import { assessMany } from "@/lib/credibility";
+import { assessLiveResults } from "@/lib/liveFieldTested";
 import { searchLiterature } from "@/lib/liveSearch";
 import { captureError } from "@/lib/errorReporting";
 import LiveSearchResults from "@/components/LiveSearchResults";
@@ -71,7 +72,7 @@ export default async function LiveResults({
   // this" earlier) let cards underline jargon for free. One batched lookup keyed by DOI —
   // no Claude call, and nothing is generated speculatively for a page of search results.
   const dois = visible.map((r) => r.doi).filter((d): d is string => !!d);
-  const [fields, cachedGlossaries, boardRows] = await Promise.all([
+  const [fields, cachedGlossaries, boardRows, fieldTestedByResult] = await Promise.all([
     assignableFields(),
     dois.length
       ? prisma.researchExplainer.findMany({
@@ -90,6 +91,11 @@ export default async function LiveResults({
           select: { externalDoi: true, post: { select: { doi: true } } },
         })
       : [],
+    // Discover is where Graze promises checked research — run the same reliability policy
+    // The Combine applies at import time against every visible result now, so the badge
+    // shows the real state instead of a "Not yet checked" placeholder that only resolves
+    // once someone clicks "Add to Graze".
+    assessLiveResults(visible),
   ]);
 
   // The same keyword matcher The Combine runs, applied to every result up front, so each
@@ -125,6 +131,7 @@ export default async function LiveResults({
         credibility={Object.fromEntries(credibility)}
         boards={fields.map((f) => ({ slug: f.slug, name: f.name }))}
         suggestionsByResult={suggestionsByResult}
+        fieldTestedByResult={fieldTestedByResult}
         isLoggedIn={!!viewer}
         boardedDois={boardedDois}
         termsByDoi={termsByDoi}

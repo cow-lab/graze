@@ -15,23 +15,18 @@ import type { GlossaryTerm } from "@/lib/jargon";
 import FieldPicker, { type PickerSuggestion } from "@/components/FieldPicker";
 import FieldTested from "@/components/FieldTested";
 import type { Assessment } from "@/lib/credibility/assess";
+import type { LiveFieldTested } from "@/lib/liveFieldTested";
 import type { LiveSearchResult } from "@/lib/liveSearch";
 import { buttonClass } from "@/lib/controls";
 
 type Board = { slug: string; name: string };
-
-// Live results carry the publisher's own work type and nothing else — none of Graze's
-// checks have run against them yet, which is what "Not yet checked" says.
-function isPreprintType(workType: string | null): boolean {
-  const type = workType?.toLowerCase().trim();
-  return type === "posted-content" || type === "preprint";
-}
 
 export default function LiveSearchResults({
   results,
   boards,
   suggestionsByResult,
   credibility,
+  fieldTestedByResult,
   isLoggedIn,
   boardedDois,
   termsByDoi,
@@ -44,6 +39,10 @@ export default function LiveSearchResults({
   suggestionsByResult: PickerSuggestion[][];
   /** Journal credibility keyed by ISSN, assessed server-side for the whole page. */
   credibility: Record<string, Assessment>;
+  // The real Field-Tested state for each result, in the same order — run server-side
+  // through the same policy The Combine uses at import time (lib/liveFieldTested.ts), so
+  // Discover shows what's actually been checked instead of a placeholder.
+  fieldTestedByResult: LiveFieldTested[];
   isLoggedIn: boolean;
   boardedDois: string[];
   // Glossaries already cached for these papers, keyed by DOI. Absent for anything nobody
@@ -59,6 +58,7 @@ export default function LiveSearchResults({
           boards={boards}
           suggestions={suggestionsByResult[i] ?? []}
           assessment={(result.issn && credibility[result.issn]) || null}
+          fieldTested={fieldTestedByResult[i]}
           isLoggedIn={isLoggedIn}
           initialOnBoard={!!result.doi && boardedDois.includes(result.doi)}
           terms={(result.doi && termsByDoi[result.doi]) || []}
@@ -85,6 +85,7 @@ function ResultRow({
   boards,
   suggestions,
   assessment,
+  fieldTested,
   terms,
   isLoggedIn,
   initialOnBoard,
@@ -93,6 +94,7 @@ function ResultRow({
   boards: Board[];
   suggestions: PickerSuggestion[];
   assessment: Assessment | null;
+  fieldTested: LiveFieldTested;
   terms: GlossaryTerm[];
   isLoggedIn: boolean;
   initialOnBoard: boolean;
@@ -125,17 +127,8 @@ function ResultRow({
       <div className="mb-1.5 flex items-start gap-2 flex-wrap">
         <FieldTested
           size="compact"
-          state={isPreprintType(result.workType) ? "PREPRINT" : "UNCHECKED"}
-          breakdown={{
-            peerReviewed: isPreprintType(result.workType) ? false : result.workType ? true : null,
-            doajListed:
-              assessment?.indexes.find((index) => index.name === "DOAJ")?.state === "in"
-                ? true
-                : null,
-            retracted: false,
-            retractionChecked: false,
-            citationCount: result.citationCount,
-          }}
+          state={fieldTested.state}
+          breakdown={fieldTested.breakdown}
           journal={assessment}
         />
         <AccessBadge isOpenAccess={result.isOpenAccess} />
