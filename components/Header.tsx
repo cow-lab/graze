@@ -14,7 +14,7 @@ export default function Header({
   unreadCount: number;
 }) {
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-panel/80 backdrop-blur-sm relative">
+    <header className="sticky top-0 z-20 border-b border-border bg-panel/95 backdrop-blur-sm">
       <div className="max-w-6xl mx-auto px-4 h-14 sm:h-16 flex items-center justify-between gap-4">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-baseline gap-2">
@@ -84,11 +84,6 @@ export default function Header({
         </div>
 
         <MobileNav user={user} />
-      </div>
-      <div className="hidden sm:block max-w-6xl mx-auto px-4 pb-2 -mt-1">
-        <p className="text-[11px] italic font-medium text-moss">
-          Take what&apos;s useful. Leave something back.
-        </p>
       </div>
     </header>
   );

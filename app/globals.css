@@ -8,6 +8,12 @@
    just enough to pass while keeping the same hue. The illustration keeps the original
    brand greens (hard-coded in GrazeBackground) — those are decorative, not text. */
 :root {
+  /* The sticky header's exact height: h-14 (56px) plus its 1px bottom border, and h-16
+     (64px) plus 1px from sm: up. DiscoverHero sizes the landing view to the viewport minus
+     this so the section below starts precisely at the fold — it used to hardcode the
+     number, which silently broke the fold the moment the header's height changed. Keep
+     this in step with the height classes in Header.tsx. */
+  --header-h: 57px;
   --color-cream: #f6ecc9;
   --color-panel: #ffffff;
   --color-panel-2: #ece4cc;
@@ -20,6 +26,12 @@
   --color-ink: #2b2a1f;
   --color-fg: #2b2a1f;
   --color-fg-muted: #6d654f; /* 5.79:1 on panel, 4.56:1 on panel-2, 4.90:1 on cream */
+}
+
+@media (min-width: 640px) {
+  :root {
+    --header-h: 65px;
+  }
 }
 
 @theme inline {

@@ -18,10 +18,10 @@ export default function DiscoverHero({
       // (The layout clips horizontal overflow so 100vw can't add a scrollbar.)
       className="relative -mt-6 ml-[calc(50%-50vw)] w-screen bg-cream"
     >
-      {/* Exactly the viewport minus the sticky header (57px below sm, 86px from sm up —
-          measured, and `-mt-6` above already cancels <main>'s top padding). That makes the
+      {/* Exactly the viewport minus the sticky header (--header-h, defined alongside the
+          palette; `-mt-6` above already cancels <main>'s top padding). That makes the
           section below start precisely at the fold: still one scroll away, never peeking. */}
-      <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-57px)] max-w-2xl flex-col items-center justify-center px-4 pt-8 pb-[max(150px,24.5vw)] text-center sm:min-h-[calc(100dvh-86px)]">
+      <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-var(--header-h))] max-w-2xl flex-col items-center justify-center px-4 pt-8 pb-[max(150px,24.5vw)] text-center">
         <h1 className="font-hand text-[clamp(56px,11vw,96px)] leading-[0.95] font-bold text-ink">
           Graze
         </h1>
