@@ -1,4 +1,4 @@
-import type { PostType } from "@prisma/client";
+type PostType = "RESEARCH" | "POST";
 
 const STYLES: Record<PostType, string> = {
   RESEARCH: "bg-teal/15 text-teal border-teal/30",
