@@ -4,17 +4,25 @@ import { auth } from "@/lib/auth";
 import { getPostDetail } from "@/lib/posts";
 import { getCommentTree } from "@/lib/comments";
 import { recordView } from "@/lib/actions/posts";
-import TypeBadge from "@/components/TypeBadge";
 import VoteButtons from "@/components/VoteButtons";
 import ExplainerPanel from "@/components/ExplainerPanel";
 import CommentForm from "@/components/CommentForm";
 import CommentThread from "@/components/CommentThread";
-import ResearchProvenance from "@/components/ResearchProvenance";
-import RetractedBadge from "@/components/RetractedBadge";
+import FieldTested from "@/components/FieldTested";
+import { fieldTestedState } from "@/lib/fieldTested";
+import FieldChips from "@/components/FieldChips";
+import LanguageBadge from "@/components/LanguageBadge";
 import AuthorDisplay from "@/components/AuthorDisplay";
+import SourceLink from "@/components/SourceLink";
 import { Quote } from "lucide-react";
 import DeletePostButton from "@/components/DeletePostButton";
-import { timeAgo } from "@/lib/utils";
+import AddToBoardButton from "@/components/AddToBoardButton";
+import RelatedPapers from "@/components/RelatedPapers";
+import { getRelatedPapers } from "@/lib/relatedPapers";
+import { assessJournal } from "@/lib/credibility";
+import { parseKeyFindings } from "@/lib/explainer";
+import { prisma } from "@/lib/prisma";
+import { plural, timeAgo } from "@/lib/utils";
 
 export default async function PostDetailPage({
   params,
@@ -29,11 +37,24 @@ export default async function PostDetailPage({
   const isLoggedIn = !!session?.user;
   const isAuthor = session?.user?.id === post.author.id;
 
-  if (post.type === "RESEARCH") {
-    await recordView(post.id);
-  }
+  await recordView(post.id);
 
-  const comments = await getCommentTree(post.id, session?.user?.id);
+  const [comments, boardCard, relatedPapers, journal] = await Promise.all([
+    getCommentTree(post.id, session?.user?.id),
+    session?.user?.id
+      ? prisma.canvasCard.findFirst({ where: { userId: session.user.id, postId: post.id } })
+      : null,
+    post.doi ? getRelatedPapers(post.doi) : Promise.resolve([]),
+    // The thorough check: one journal, every source including the per-journal ones the
+    // search page skips. Cached for a month after the first look.
+    assessJournal(post.issn),
+  ]);
+
+  // What the "go and read it" links should point at, best first: a free full text if the
+  // paper carries one, otherwise the publisher's page via its DOI.
+  const sourceUrl =
+    post.externalUrl ?? post.fileUrl ?? (post.doi ? `https://doi.org/${post.doi}` : null);
+  const paperRef = { postId: post.id, doi: post.doi };
 
   return (
     <div className="max-w-3xl mx-auto flex flex-col gap-6">
@@ -48,139 +69,121 @@ export default async function PostDetailPage({
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
-                <TypeBadge type={post.type} />
-                <Link
-                  href={`/?board=${post.board.slug}`}
-                  className="font-mono text-[10px] uppercase tracking-wide text-fg-muted hover:text-fg transition-colors"
-                >
-                  F~{post.board.slug}
-                </Link>
-                {post.type === "RESEARCH" && (
-                  <ResearchProvenance source={post.source} sourceName={post.sourceName} />
-                )}
-                {post.retractedAt && <RetractedBadge />}
+                <FieldChips fields={post.fields} />
+                <FieldTested
+                  state={fieldTestedState({
+                    reliability: post.reliability,
+                    retracted: !!post.retractedAt,
+                  })}
+                  breakdown={{
+                    peerReviewed:
+                      post.reliability === "PREPRINT" ? false : post.workType ? true : null,
+                    doajListed:
+                      post.reliability === "PEER_REVIEWED_LISTED"
+                        ? true
+                        : journal.indexes.find((index) => index.name === "DOAJ")?.state === "in"
+                          ? true
+                          : null,
+                    retracted: !!post.retractedAt,
+                    retractionChecked: post.source === "COMBINE",
+                    citationCount: post.citationCount,
+                  }}
+                  journal={journal}
+                  source={post.source}
+                  sourceName={post.sourceName}
+                />
+                <LanguageBadge code={post.language} />
               </div>
-              {isAuthor && <DeletePostButton postId={post.id} />}
+              <div className="flex items-center gap-2">
+                <AddToBoardButton
+                  postId={post.id}
+                  initialOnBoard={!!boardCard}
+                  isLoggedIn={isLoggedIn}
+                />
+                {isAuthor && <DeletePostButton postId={post.id} />}
+              </div>
             </div>
             <h1 className="font-heading text-2xl font-semibold leading-tight">{post.title}</h1>
             <div className="flex items-center gap-2 mt-2 font-mono text-[11px] text-fg-muted flex-wrap">
               <AuthorDisplay
                 userId={post.author.id}
                 name={post.author.name}
-                hasVerifiedAffiliation={post.author._count.affiliations > 0}
                 isAnonymous={post.isAnonymous}
                 cowNumber={post.author.cowNumber}
               />
               <span>·</span>
               <span>{timeAgo(post.createdAt)}</span>
-              {post.type === "RESEARCH" && (
-                <>
-                  <span>·</span>
-                  <span>{post.viewCount} views</span>
-                </>
-              )}
+              <span>·</span>
+              <span>{plural(post.viewCount, "view")}</span>
             </div>
 
-            {post.type === "RESEARCH" && (
-              <div className="mt-4 flex flex-col gap-4">
-                <div className="font-mono text-xs text-fg-muted flex flex-wrap gap-x-4 gap-y-1">
-                  <span>Authors: {post.authors}</span>
-                  <span>Field: {post.field}</span>
-                  <span>Year: {post.year}</span>
-                  {post.doi && <span>DOI: {post.doi}</span>}
-                  {post.citationCount != null && (
-                    <span className="inline-flex items-center gap-1">
-                      <Quote size={11} /> {post.citationCount.toLocaleString()} citations
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.abstract}</p>
-                <div className="flex items-center gap-3 flex-wrap">
-                  {post.externalUrl && (
-                    <a
-                      href={post.externalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 rounded-md border border-border text-sm text-fg hover:border-moss hover:text-moss transition"
-                    >
-                      View external link ↗
-                    </a>
-                  )}
-                  {post.fileUrl && (
-                    <a
-                      href={post.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 rounded-md border border-border text-sm text-fg hover:border-moss hover:text-moss transition"
-                    >
-                      Download PDF ↓
-                    </a>
-                  )}
-                  {post.explainer && (
-                    <ExplainerPanel
-                      postId={post.id}
-                      summary={post.explainer.summary}
-                      terms={JSON.parse(post.explainer.termsJson)}
-                      quiz={JSON.parse(post.explainer.quizJson)}
-                      isDemo={post.explainer.isDemo}
-                    />
-                  )}
-                </div>
-
-                {post.referencingPosts.length > 0 && (
-                  <div>
-                    <h3 className="font-mono text-[11px] uppercase tracking-wide text-fg-muted mb-2">
-                      Posts referencing this paper ({post.referencingPosts.length})
-                    </h3>
-                    <ul className="flex flex-col gap-1.5">
-                      {post.referencingPosts.map((s) => (
-                        <li key={s.id}>
-                          <Link
-                            href={`/post/${s.id}`}
-                            className="text-sm text-fg hover:text-moss transition-colors"
-                          >
-                            {s.title}
-                          </Link>
-                          <span className="font-mono text-[11px] text-fg-muted ml-2">
-                            by{" "}
-                            <AuthorDisplay
-                              userId={s.author.id}
-                              name={s.author.name}
-                              hasVerifiedAffiliation={s.author._count.affiliations > 0}
-                              isAnonymous={s.isAnonymous}
-                              cowNumber={s.author.cowNumber}
-                            />
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+            <div className="mt-4 flex flex-col gap-4">
+              <div className="font-mono text-xs text-fg-muted flex flex-wrap gap-x-4 gap-y-1">
+                <span>Authors: {post.authors}</span>
+                <span>Field: {post.field}</span>
+                <span>Year: {post.year}</span>
+                {post.doi && <span>DOI: {post.doi}</span>}
+                {post.citationCount != null && (
+                  <span className="inline-flex items-center gap-1">
+                    <Quote size={11} aria-hidden="true" /> {post.citationCount.toLocaleString()} citations
+                  </span>
                 )}
               </div>
-            )}
-
-            {post.type === "POST" && (
-              <div className="mt-4 flex flex-col gap-4">
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.description}</p>
-                {post.refPost && (
-                  <Link
-                    href={`/post/${post.refPost.id}`}
-                    className="inline-flex items-center gap-1.5 text-sm text-teal hover:underline w-fit"
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.abstract}</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                {post.externalUrl && (
+                  <SourceLink
+                    href={post.externalUrl}
+                    paper={paperRef}
+                    showIcon={false}
+                    className="px-3 py-1.5 rounded-md border border-border text-sm text-fg hover:border-moss hover:text-moss transition"
                   >
-                    <TypeBadge type={post.refPost.type} />
-                    Responding to: {post.refPost.title}
-                  </Link>
+                    View external link ↗
+                  </SourceLink>
+                )}
+                {post.fileUrl && (
+                  <SourceLink
+                    href={post.fileUrl}
+                    paper={paperRef}
+                    showIcon={false}
+                    className="px-3 py-1.5 rounded-md border border-border text-sm text-fg hover:border-moss hover:text-moss transition"
+                  >
+                    Download PDF ↓
+                  </SourceLink>
+                )}
+                {post.explainer && (
+                  <ExplainerPanel
+                    discussHref="#comments"
+                    sourceUrl={sourceUrl}
+                    paper={paperRef}
+                    language={post.language}
+                    explainer={{
+                      tldr: post.explainer.tldr,
+                      keyFindings: parseKeyFindings(post.explainer.keyFindingsJson),
+                      summary: post.explainer.summary,
+                      terms: JSON.parse(post.explainer.termsJson),
+                      quiz: JSON.parse(post.explainer.quizJson),
+                      isDemo: post.explainer.isDemo,
+                    }}
+                  />
                 )}
               </div>
-            )}
+
+              <RelatedPapers papers={relatedPapers} />
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm">
-        <h2 className="font-heading text-base font-semibold mb-3">
+      <div id="comments" className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm">
+        <h2 className="font-heading text-base font-semibold mb-1">
           {post._count.comments} Comments
         </h2>
+        <p className="text-sm text-fg-muted mb-3">
+          The summary above is machine-written and the abstract is the authors&apos; own pitch.
+          This is where people who read the paper say what it actually found, what the summary
+          missed, and which part is worth your time.
+        </p>
         {isLoggedIn ? (
           <CommentForm postId={post.id} />
         ) : (
@@ -193,7 +196,12 @@ export default async function PostDetailPage({
         )}
         <div className="mt-4 flex flex-col divide-y divide-border">
           {comments.map((c) => (
-            <CommentThread key={c.id} comment={c} postId={post.id} isLoggedIn={isLoggedIn} />
+            <CommentThread
+              key={c.id}
+              comment={c}
+              postId={post.id}
+              isLoggedIn={isLoggedIn}
+            />
           ))}
         </div>
       </div>

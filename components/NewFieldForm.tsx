@@ -38,7 +38,7 @@ export default function NewFieldForm() {
           name="description"
           rows={3}
           required
-          placeholder="What kinds of problems, research, and solutions belong here?"
+          placeholder="What kind of research belongs here?"
           className={inputClass}
         />
       </div>
@@ -67,7 +67,7 @@ export default function NewFieldForm() {
         <button
           type="submit"
           disabled={pending}
-          className="px-5 py-2 rounded-md bg-moss text-ink text-sm font-medium hover:brightness-110 transition disabled:opacity-60"
+          className="px-5 py-2 rounded-md bg-moss text-white text-sm font-medium hover:brightness-110 transition disabled:opacity-60"
         >
           {pending ? "Creating…" : "Create Field"}
         </button>

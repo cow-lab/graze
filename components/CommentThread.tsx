@@ -1,8 +1,43 @@
+import { BookOpenCheck, CircleCheck } from "lucide-react";
 import type { CommentNode } from "@/lib/comments";
 import CommentVoteButtons from "@/components/CommentVoteButtons";
 import CommentForm from "@/components/CommentForm";
 import AuthorDisplay from "@/components/AuthorDisplay";
 import { timeAgo } from "@/lib/utils";
+
+// Deliberately not a badge: no colour block, no border, no level. It answers one question —
+// did this person go past the summary before writing — and then gets out of the way. The
+// same signal is weighted into comment ranking (see lib/comments.ts), which is where it
+// does most of its work.
+function EngagementMarker({
+  readSource,
+  passedCheck,
+}: {
+  readSource: boolean;
+  passedCheck: boolean;
+}) {
+  if (readSource) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-moss"
+        title="This person opened the original source for this paper."
+      >
+        <BookOpenCheck size={11} aria-hidden="true" /> read the source
+      </span>
+    );
+  }
+  if (passedCheck) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-moss"
+        title="This person answered every question in this paper's comprehension check correctly."
+      >
+        <CircleCheck size={11} aria-hidden="true" /> passed the check
+      </span>
+    );
+  }
+  return null;
+}
 
 export default function CommentThread({
   comment,
@@ -22,12 +57,12 @@ export default function CommentThread({
           <AuthorDisplay
             userId={comment.author.id}
             name={comment.author.name}
-            hasVerifiedAffiliation={comment.author._count.affiliations > 0}
             isAnonymous={comment.isAnonymous}
             cowNumber={comment.author.cowNumber}
           />
           <span>·</span>
           <span>{timeAgo(comment.createdAt)}</span>
+          <EngagementMarker readSource={comment.readSource} passedCheck={comment.passedCheck} />
         </div>
         <p className="text-sm text-fg mt-1 whitespace-pre-wrap">{comment.body}</p>
         <div className="flex items-center gap-3 mt-1.5">

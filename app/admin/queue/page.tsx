@@ -1,40 +1,43 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { requireAdminUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import RunCombineButton from "@/components/RunCombineButton";
 import CheckRetractionsButton from "@/components/CheckRetractionsButton";
 import QueueActions from "@/components/QueueActions";
+import AdminNav from "@/components/AdminNav";
+import EmptyState from "@/components/EmptyState";
 
 export default async function AdminQueuePage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!user || user.role !== "ADMIN") redirect("/");
+  await requireAdminUser();
 
   const pending = await prisma.post.findMany({
     where: { status: "PENDING", source: "COMBINE" },
-    include: { board: { select: { slug: true } }, explainer: true },
+    include: {
+      fields: { select: { board: { select: { slug: true, name: true } } } },
+      explainer: true,
+    },
     orderBy: { createdAt: "desc" },
   });
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="font-heading text-2xl font-semibold mb-1">Moderation queue</h1>
-      <p className="text-sm text-fg-muted mb-6">
-        Research that passes The Combine&apos;s checks (DOAJ/allowlist-verified journal, not a
-        duplicate, has a real abstract) now publishes straight to the library — nothing normally
-        lands here. This queue only holds anything a future check flags for manual review.
-      </p>
-
-      <div className="mb-6 flex flex-col gap-4 items-start">
-        <RunCombineButton />
-        <CheckRetractionsButton />
+      <div className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm mb-6">
+        <h1 className="font-heading text-2xl font-semibold mb-1">Moderation queue</h1>
+        <p className="text-sm text-fg-muted mb-4">
+          Research that passes every check — peer-reviewed work type, DOAJ-listed journal, no
+          retraction on record, no outlying retraction history behind the journal — publishes
+          straight to the library. This queue holds the rest: papers a person picked from live
+          search whose journal isn&apos;t listed, preprints someone wants in anyway, and the
+          cases where two sources disagree. Those last ones are deliberately not resolved
+          automatically.
+        </p>
+        <div className="flex flex-col gap-4 items-start">
+          <RunCombineButton />
+          <CheckRetractionsButton />
+        </div>
       </div>
 
       {pending.length === 0 ? (
-        <p className="text-sm text-fg-muted">Nothing pending review right now.</p>
+        <EmptyState>Nothing pending review right now.</EmptyState>
       ) : (
         <div className="flex flex-col gap-3">
           {pending.map((post) => (
@@ -46,11 +49,25 @@ export default async function AdminQueuePage() {
                 <div className="min-w-0">
                   <h3 className="font-heading text-base font-semibold">{post.title}</h3>
                   <p className="text-sm text-fg-muted mt-0.5">
-                    {post.authors} · {post.field} · {post.year} · F~{post.board.slug}
+                    {post.authors} · {post.field} · {post.year} ·{" "}
+                    {post.fields.map((f) => `F~${f.board.slug}`).join(" ") || "no Field"}
                   </p>
                 </div>
                 <QueueActions postId={post.id} />
               </div>
+
+              {/* Why this one is waiting on a person. The checks never resolve a
+                  disagreement between sources themselves — this is the sentence they
+                  leave behind when they hand it over. */}
+              {post.reviewReason && (
+                <p className="mt-3 rounded-md border border-sun/50 bg-sun/10 px-3 py-2 text-sm text-ink">
+                  <span className="font-mono text-[10px] uppercase tracking-wide text-fg-muted">
+                    Why it&apos;s here
+                  </span>
+                  <br />
+                  {post.reviewReason}
+                </p>
+              )}
 
               <p className="text-sm mt-3 leading-relaxed">{post.abstract}</p>
 
@@ -82,19 +99,7 @@ export default async function AdminQueuePage() {
         </div>
       )}
 
-      <p className="text-xs text-fg-muted mt-8">
-        <Link href="/admin/duplicates" className="text-moss hover:underline">
-          Possible duplicates
-        </Link>{" "}
-        ·{" "}
-        <Link href="/admin/fields" className="text-moss hover:underline">
-          Field administration
-        </Link>{" "}
-        ·{" "}
-        <Link href="/" className="text-moss hover:underline">
-          Back to feed
-        </Link>
-      </p>
+      <AdminNav />
     </div>
   );
 }

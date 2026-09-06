@@ -4,7 +4,13 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { Flag } from "lucide-react";
 import { reportField } from "@/lib/actions/fields";
 
-export default function ReportFieldForm({ boardId }: { boardId: string }) {
+type ReportableField = { id: string; slug: string };
+
+// One report control for the whole sidebar, rather than a disclosure hanging off every
+// Field row — with ~12 Fields listed, the per-row version doubled the sidebar's height and
+// buried the actual navigation. Reporting is a rare action, so it lives here as a single
+// collapsed affordance with a Field picker.
+export default function ReportFieldForm({ fields }: { fields: ReportableField[] }) {
   const [error, formAction, pending] = useActionState(reportField, undefined);
   const [reported, setReported] = useState(false);
   const wasPending = useRef(false);
@@ -15,21 +21,40 @@ export default function ReportFieldForm({ boardId }: { boardId: string }) {
   }, [pending, error]);
 
   if (reported) {
-    return <p className="text-[11px] text-fg-muted px-2">Reported — thanks, an admin will take a look.</p>;
+    return (
+      <p className="text-[11px] text-fg-muted px-1">
+        Reported — thanks, an admin will take a look.
+      </p>
+    );
   }
 
   return (
     <details className="group">
-      <summary className="flex items-center gap-1 px-2 py-1 text-[11px] text-fg-muted hover:text-rose transition-colors cursor-pointer list-none">
-        <Flag size={11} /> Report this Field
+      <summary className="flex items-center gap-1.5 px-1 py-1 text-[11px] text-fg-muted hover:text-rose transition-colors cursor-pointer list-none">
+        <Flag size={11} aria-hidden="true" /> Report a Field
       </summary>
-      <form action={formAction} className="flex flex-col gap-1.5 px-2 pb-2 pt-1">
-        <input type="hidden" name="boardId" value={boardId} />
+      <form action={formAction} className="flex flex-col gap-1.5 px-1 pb-1 pt-1.5">
+        <select
+          name="boardId"
+          required
+          defaultValue=""
+          aria-label="Field to report"
+          className="bg-panel-2 border border-border rounded-md px-2 py-1.5 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-moss"
+        >
+          <option value="" disabled>
+            Choose a Field…
+          </option>
+          {fields.map((f) => (
+            <option key={f.id} value={f.id}>
+              F~{f.slug}
+            </option>
+          ))}
+        </select>
         <textarea
           name="reason"
           required
           rows={2}
-          placeholder="What's wrong with this Field?"
+          placeholder="What's wrong with it?"
           className="bg-panel-2 border border-border rounded-md px-2 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:outline-none focus:ring-1 focus:ring-moss resize-none"
         />
         {error && <p className="text-[11px] text-rose">{error}</p>}

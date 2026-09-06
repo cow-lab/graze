@@ -1,19 +1,16 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { requireAdminUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { normalizeTitle } from "@/lib/combine/utils";
 import MergePostsButton from "@/components/MergePostsButton";
+import AdminNav from "@/components/AdminNav";
+import EmptyState from "@/components/EmptyState";
 
 export default async function AdminDuplicatesPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!user || user.role !== "ADMIN") redirect("/");
+  await requireAdminUser();
 
   const posts = await prisma.post.findMany({
-    where: { type: "RESEARCH", status: { not: "REJECTED" } },
+    where: { status: { not: "REJECTED" } },
     select: {
       id: true,
       title: true,
@@ -39,15 +36,17 @@ export default async function AdminDuplicatesPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="font-heading text-2xl font-semibold mb-1">Possible duplicate research</h1>
-      <p className="text-sm text-fg-muted mb-8">
-        These share an exact normalized title — usually a preprint and its published version that
-        slipped past the automatic check, or a straight re-submission. Pick which one to keep; the
-        other&apos;s votes and comments move over to it, and it&apos;s removed.
-      </p>
+      <div className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm mb-8">
+        <h1 className="font-heading text-2xl font-semibold mb-1">Possible duplicate research</h1>
+        <p className="text-sm text-fg-muted">
+          These share an exact normalized title — usually a preprint and its published version
+          that slipped past the automatic check, or a straight re-submission. Pick which one to
+          keep; the other&apos;s votes and comments move over to it, and it&apos;s removed.
+        </p>
+      </div>
 
       {duplicateGroups.length === 0 ? (
-        <p className="text-sm text-fg-muted">No title collisions right now.</p>
+        <EmptyState>No title collisions right now.</EmptyState>
       ) : (
         <div className="flex flex-col gap-6">
           {duplicateGroups.map((group) => (
@@ -82,19 +81,7 @@ export default async function AdminDuplicatesPage() {
         </div>
       )}
 
-      <p className="text-xs text-fg-muted mt-8">
-        <Link href="/admin/queue" className="text-moss hover:underline">
-          Moderation queue
-        </Link>{" "}
-        ·{" "}
-        <Link href="/admin/fields" className="text-moss hover:underline">
-          Field administration
-        </Link>{" "}
-        ·{" "}
-        <Link href="/" className="text-moss hover:underline">
-          Back to feed
-        </Link>
-      </p>
+      <AdminNav />
     </div>
   );
 }

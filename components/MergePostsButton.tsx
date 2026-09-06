@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Merge } from "lucide-react";
 import { mergePostsAction } from "@/lib/actions/admin";
+import InlineError from "@/components/InlineError";
 
 export default function MergePostsButton({
   keepPostId,
@@ -25,11 +26,8 @@ export default function MergePostsButton({
     }
     setError(null);
     startTransition(async () => {
-      try {
-        await mergePostsAction(keepPostId, otherPostIds);
-      } catch {
-        setError("Merge failed — check the server logs.");
-      }
+      const result = await mergePostsAction(keepPostId, otherPostIds);
+      if (!result.ok) setError(result.message);
     });
   }
 
@@ -39,12 +37,12 @@ export default function MergePostsButton({
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-moss text-ink text-xs font-medium hover:brightness-110 transition disabled:opacity-60"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-moss text-white text-xs font-medium hover:brightness-110 transition disabled:opacity-60"
       >
-        <Merge size={12} />
+        <Merge size={12} aria-hidden="true" />
         {isPending ? "Merging…" : "Keep this, merge others in"}
       </button>
-      {error && <p className="text-xs text-rose">{error}</p>}
+      <InlineError message={error} />
     </div>
   );
 }

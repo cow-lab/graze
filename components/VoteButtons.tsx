@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Sprout, ArrowDown } from "lucide-react";
 import { voteOnPost } from "@/lib/actions/posts";
+import InlineError from "@/components/InlineError";
 import type { VoteValue } from "@prisma/client";
 
 export default function VoteButtons({
@@ -21,6 +22,7 @@ export default function VoteButtons({
 }) {
   const [optimisticScore, setOptimisticScore] = useState(score);
   const [optimisticVote, setOptimisticVote] = useState<VoteValue | null>(userVote);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -38,35 +40,50 @@ export default function VoteButtons({
     else if (prevVote === null) delta = value === "UP" ? 1 : -1;
     else delta = value === "UP" ? 2 : -2;
 
+    setError(null);
     setOptimisticScore(prevScore + delta);
     setOptimisticVote(prevVote === value ? null : value);
 
     startTransition(async () => {
-      await voteOnPost(postId, value);
+      const result = await voteOnPost(postId, value);
+      if (!result.ok) {
+        // Put the count back where it was: leaving the optimistic number up would tell
+        // this person their vote landed when it didn't.
+        setOptimisticScore(prevScore);
+        setOptimisticVote(prevVote);
+        setError(result.message);
+      }
     });
   }
 
   const wrapperClass =
     orientation === "vertical" ? "flex flex-col items-center gap-0.5" : "flex items-center gap-2";
 
+  // `aria-pressed` communicates the toggled state, so a screen reader announces whether
+  // you've already grown this post rather than just "button, Grow this". The score is
+  // exposed as a labelled live region so a vote's effect is announced, not silent.
   return (
     <div className={`${wrapperClass} font-mono`} aria-disabled={isPending}>
       <button
         type="button"
         onClick={() => handleVote("UP")}
-        aria-label="Grow this"
+        aria-label="Grow this post"
+        aria-pressed={optimisticVote === "UP"}
         title="Grow this"
-        className={`leading-none transition-colors ${
+        className={`leading-none transition-colors rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${
           optimisticVote === "UP" ? "text-moss" : "text-fg-muted hover:text-moss"
         }`}
       >
         <Sprout
           size={16}
+          aria-hidden="true"
           fill={optimisticVote === "UP" ? "currentColor" : "none"}
           strokeWidth={optimisticVote === "UP" ? 2.5 : 2}
         />
       </button>
       <span
+        aria-live="polite"
+        aria-atomic="true"
         className={`text-xs tabular-nums ${
           optimisticVote === "UP"
             ? "text-moss"
@@ -75,18 +92,21 @@ export default function VoteButtons({
               : "text-fg-muted"
         }`}
       >
+        <span className="sr-only">Score: </span>
         {optimisticScore}
       </span>
       <button
         type="button"
         onClick={() => handleVote("DOWN")}
-        aria-label="Downvote"
-        className={`leading-none transition-colors ${
+        aria-label="Downvote this post"
+        aria-pressed={optimisticVote === "DOWN"}
+        className={`leading-none transition-colors rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${
           optimisticVote === "DOWN" ? "text-rose" : "text-fg-muted hover:text-rose"
         }`}
       >
-        <ArrowDown size={16} />
+        <ArrowDown size={16} aria-hidden="true" />
       </button>
+      <InlineError message={error} className={orientation === "vertical" ? "w-32 text-center" : ""} />
     </div>
   );
 }

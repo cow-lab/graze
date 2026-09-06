@@ -3,13 +3,15 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
-}
-
-enum PostType {
-  POST
-  RESEARCH
+  provider = "postgresql"
+  // The pooled connection string, used by the running app. On a serverless host every
+  // request can open its own connection, and a plain Postgres connection limit is reached
+  // fast — so this points at the provider's pooler (Neon's `-pooler` host / PgBouncer).
+  url       = env("DATABASE_URL")
+  // Migrations need a direct, unpooled connection: a pooler in transaction mode can't run
+  // the session-level statements DDL requires. Getting this wrong is the single most common
+  // way a first Prisma deploy fails, which is why it's wired up from the start.
+  directUrl = env("DIRECT_URL")
 }
 
 enum VoteValue {
@@ -38,15 +40,46 @@ enum PostStatus {
   REJECTED
 }
 
+// The one composite reliability signal shown on a paper, computed from checkable, source-
+// based facts only — never from a model's opinion of a paper's quality. In precedence
+// order as rendered (retraction, tracked separately on `retractedAt`, outranks all of it):
+//
+//   FLAGGED               two independent sources disagree, or the journal is a retraction
+//                         outlier in the Retraction Watch data. Never auto-resolved — it
+//                         means "a person needs to look at this", and it sits in
+//                         /admin/queue until one does.
+//   PREPRINT              Crossref/OpenAlex type says posted-content/preprint. Readable via
+//                         live search, but never silently promoted into the curated library
+//                         as though it were peer reviewed.
+//   PEER_REVIEWED_LISTED  a journal-article in a DOAJ-listed journal with no retraction
+//                         history against it. The only state The Combine publishes on its own.
+//   PEER_REVIEWED         a journal-article, but its journal isn't DOAJ-listed — one check
+//                         passed, one didn't.
+//   UNVERIFIED            submitted by a person, no external checks run against it.
+enum ReliabilityStatus {
+  FLAGGED
+  PREPRINT
+  PEER_REVIEWED_LISTED
+  PEER_REVIEWED
+  UNVERIFIED
+}
+
 // Spam defense for Fields is traction-based, not a review queue: every new Field (whether
 // a user created it or The Combine suggested it) starts PROVISIONAL — listed in a small
 // "New fields" section, not the main sidebar. It's promoted to ACTIVE automatically once
 // posts from a few distinct users land in it (see maybePromoteField in lib/actions/fields.ts),
 // or an admin can promote/suspend it directly from /admin/fields. A spam Field just never
 // earns traction and stays out of the way — nobody has to manually reject it.
+// ARCHIVED and SUSPENDED are both "not in the sidebar", but they mean different things
+// and behave differently on purpose:
+//   ARCHIVED  — retired in good standing. Its posts stay readable and keep appearing in
+//               the feed; it just can't take new ones and The Combine stops feeding it.
+//   SUSPENDED — a moderation action against bad content. Hidden outright, posts included.
+// Both are reversible from /admin/fields.
 enum FieldStatus {
   PROVISIONAL
   ACTIVE
+  ARCHIVED
   SUSPENDED
 }
 
@@ -62,39 +95,19 @@ model User {
   // Random 4-digit number assigned the first time this user posts anonymously, then
   // reused for every anonymous post/comment they make — lets others follow one
   // anonymous contributor's activity without it ever linking back to their real profile.
-  cowNumber        Int?    @unique
-  websiteUrl       String?
-  linkedinUrl      String?
-  googleScholarUrl String?
-  githubUrl        String?
+  cowNumber     Int?          @unique
 
   posts         Post[]
   comments      Comment[]
   votes         Vote[]
   commentVotes  CommentVote[]
   createdBoards Board[]       @relation("BoardCreator")
-  affiliations  Affiliation[]
   fieldReports  FieldReport[]
-}
-
-// A role/institution a user has listed on their profile — e.g. "PhD Candidate, MIT".
-// A user can have several (a professor consulting for a startup, for instance). Each is
-// verified independently: `verified` is true only when `email`'s domain is a matching
-// .edu or institutional company domain, mirroring the same domain heuristic used
-// elsewhere in the app (see lib/verification.ts) rather than a live email round-trip,
-// since no SMTP provider is configured. Unverified affiliations are still shown, just
-// without the checkmark.
-model Affiliation {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  institution String
-  email       String
-  verified    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  @@index([userId])
+  notifications Notification[] @relation("NotificationRecipient")
+  actedOn       Notification[] @relation("NotificationActor")
+  canvasCards   CanvasCard[]
+  canvasLinks   CanvasLink[]
+  engagements   PaperEngagement[]
 }
 
 model Board {
@@ -103,8 +116,9 @@ model Board {
   name               String
   description        String
   // JSON-encoded string[] — the keywords The Combine uses to query Crossref/OpenAlex/etc
-  // for this Field. Stored as JSON text rather than a native array since SQLite has no
-  // array column type.
+  // for this Field. Stored as JSON text rather than a native array — it was written when
+  // this ran on SQLite, and the app parses it everywhere, so it stays text rather than
+  // becoming a Postgres array in the same change as the database move.
   searchKeywordsJson String      @default("[]")
   status             FieldStatus @default(PROVISIONAL)
   // True when The Combine proposed this Field itself (a cluster of papers didn't match any
@@ -116,8 +130,35 @@ model Board {
   createdById String?
   createdBy   User?         @relation("BoardCreator", fields: [createdById], references: [id])
 
-  posts       Post[]
+  posts       PostField[]
   reports     FieldReport[]
+}
+
+// How a paper came to be filed under a Field. Every entry point runs the same keyword
+// matcher (lib/fieldMatch.ts); this records which one it came through, which is what makes
+// an odd-looking assignment debuggable later.
+enum FieldAssignmentSource {
+  // The Field whose keywords surfaced this paper during automated ingestion.
+  COMBINE
+  // Suggested by the keyword matcher and kept by whoever added the paper.
+  KEYWORD_MATCH
+  // Added or kept by hand, against the matcher's suggestion or in addition to it.
+  USER
+  // Matched into a Field that was created after this paper was already in the library.
+  BACKFILL
+}
+
+model PostField {
+  postId  String
+  post    Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  assignedBy FieldAssignmentSource @default(USER)
+  createdAt  DateTime              @default(now())
+
+  @@id([postId, boardId])
+  @@index([boardId])
 }
 
 // A "report this Field" flag — the backstop behind the traction-based promotion system,
@@ -135,19 +176,23 @@ model FieldReport {
   @@index([boardId])
 }
 
+// Every Post is a research entry — a paper. The standalone community-post type is gone:
+// discussion attaches to papers as comments, and nowhere else.
 model Post {
   id          String     @id @default(cuid())
-  type        PostType
   title       String
   createdAt   DateTime   @default(now())
 
   authorId    String
   author      User       @relation(fields: [authorId], references: [id])
-  boardId     String
-  board       Board      @relation(fields: [boardId], references: [id])
+
+  // Fields this paper is filed under — many, not one. A paper on AI in clinical triage
+  // genuinely belongs in both Healthtech and an AI Field; forcing a single choice
+  // undercounts the overlap and hides the paper from half the people looking for it.
+  fields      PostField[]
 
   // authorId always points at the real account — anonymity is purely a display-layer
-  // choice (render as "Cow #XXXX" instead of the author's name/affiliations), never a
+  // choice (render as "Cow #XXXX" instead of the author's name), never a
   // missing/faked author. Needed so the poster can still be moderated and can still
   // manage their own anonymous posts from their real account.
   isAnonymous Boolean    @default(false)
@@ -160,10 +205,6 @@ model Post {
   // DOI, when known — the dedup key The Combine uses to avoid importing the same paper twice.
   doi         String?    @unique
 
-  // Community post fields — a question, analysis, project, or discussion
-  description String?
-
-  // Research fields
   authors     String?
   field       String?
   year        Int?
@@ -175,23 +216,122 @@ model Post {
   // now that account-level verification isn't in play for research. Null for a
   // user-submitted paper nobody has cross-referenced yet.
   citationCount Int?
-  // Set by the periodic Crossref retraction re-sync (lib/combine/retractions.ts) if a
-  // previously-imported paper turns out to have been retracted. Null means "not retracted
-  // as of the last check," not "guaranteed never retracted."
+  // ISO 639-1 code of the work's original language, when the source reports one. Surfaced
+  // on the card and in the explainer whenever it isn't English: a "Chew on this" summary
+  // of a Spanish abstract is written in English, and the panel asks readers to verify
+  // against the source — which they can't do silently across a language boundary.
+  language      String?
+  // Set by the periodic Retraction Watch re-sync (lib/combine/retractions.ts) if a
+  // previously-imported paper turns out to have been retracted. Papers already known to be
+  // retracted are rejected at import and never get this far. Null means "not retracted as
+  // of the last check," not "guaranteed never retracted."
   retractedAt   DateTime?
 
-  // Optional link from a community post to the research post it's discussing/responding to
-  refPostId        String?
-  refPost          Post?  @relation("PostRef", fields: [refPostId], references: [id])
-  referencingPosts Post[] @relation("PostRef")
+  // The journal's ISSN, when the source reported one — the join key to JournalCredibility.
+  issn          String?
+  // The source's own work type, verbatim ("journal-article", "posted-content", "preprint").
+  // Kept raw rather than collapsed to a boolean so a future check can tell a book chapter
+  // from a conference paper without a re-import.
+  workType      String?
+  // The composite signal rendered on the card — see ReliabilityStatus.
+  reliability   ReliabilityStatus @default(UNVERIFIED)
+  // Why this paper is waiting on a human, in a sentence an admin can act on. Only set for
+  // PENDING/FLAGGED rows.
+  reviewReason  String?
 
-  comments    Comment[]
-  votes       Vote[]
-  explainer   ResearchExplainer?
+  comments      Comment[]
+  votes         Vote[]
+  notifications Notification[]
+  canvasCards   CanvasCard[]
+  engagements   PaperEngagement[]
+  explainer     ResearchExplainer?
 
-  @@index([boardId])
-  @@index([type])
   @@index([status])
+}
+
+// What we know about a journal, cached per ISSN and refreshed on a TTL. Everything here is
+// a fact some named source asserts — an index that lists the journal, a price it publishes,
+// counts anyone can recompute — never a score this app invented.
+//
+// Nullable booleans are load-bearing: `null` means "we haven't checked", `false` means
+// "checked, not there". Those are very different claims, and collapsing them into one is how
+// a credibility system starts lying. Absence from any single index is not evidence of
+// anything on its own — Nature isn't in DOAJ (it isn't open access), and a perfectly good
+// humanities journal won't be in MEDLINE.
+model JournalCredibility {
+  id        String  @id @default(cuid())
+  issn      String  @unique
+  title     String?
+  publisher String?
+
+  // --- Indexing status ---
+  inDoaj         Boolean?
+  inMedline      Boolean?
+  // Both need paid/keyed access; the adapters exist and return null until a key is set.
+  inScopus       Boolean?
+  inWebOfScience Boolean?
+
+  // --- Transparency: what the journal publishes about itself ---
+  // A publicly recorded APC is evidence of disclosure. Its absence is not proof of
+  // concealment — only that no open source we read has a price for it.
+  apcUsd               Int?
+  apcDisclosureUrl     String?
+  reviewProcess        String?
+  reviewUrl            String?
+  publicationTimeWeeks Int?
+
+  // --- Volume and citation signals, from OpenAlex ---
+  worksCount    Int?
+  citedByCount  Int?
+  meanCitedness Float?
+  hIndex        Int?
+
+  // --- Retraction history, from the Retraction Watch data Crossref distributes ---
+  retractions    Int?
+  retractionRate Float?
+
+  // Naming-pattern score (see lib/credibility/scope.ts). Stored so it can be inspected and
+  // argued with; deliberately never sufficient on its own to caution or hide a result.
+  broadScopeScore Int?
+
+  checkedAt DateTime @default(now())
+  flags     JournalFlag[]
+}
+
+// A specific, attributed accusation against a journal. Never inferred: every row names the
+// source that made the claim and, where there is one, a link to it — so a journal can see
+// who said what and appeal to them rather than to us.
+model JournalFlag {
+  id      String             @id @default(cuid())
+  issn    String
+  journal JournalCredibility @relation(fields: [issn], references: [issn], onDelete: Cascade)
+
+  kind        JournalFlagKind
+  severity    FlagSeverity    @default(CAUTION)
+  source      String
+  evidenceUrl String?
+  note        String?
+  createdAt   DateTime        @default(now())
+
+  // One claim per source per kind — re-importing a list updates rather than duplicates.
+  @@unique([issn, source, kind])
+  @@index([issn])
+}
+
+enum JournalFlagKind {
+  PREDATORY_LIST
+  HIJACKED
+  REMOVED_FROM_INDEX
+  RETRACTION_OUTLIER
+  OPERATOR_NOTE
+}
+
+enum FlagSeverity {
+  // Shown on the result, with the source named. The result still appears.
+  CAUTION
+  // Hidden from search results by default, behind a "show hidden" toggle and a count, so
+  // the tool never silently pretends a paper doesn't exist.
+  EXCLUDE
 }
 
 // A journal/publisher known to be legitimate peer-reviewed open access — the validity
@@ -220,10 +360,27 @@ model ApiResponseCache {
   @@unique([source, queryKey])
 }
 
+// A "Chew on this" explainer. Two ways one exists:
+//   - attached to a Post in the curated library (postId set), or
+//   - generated on demand for a live-search result that isn't in the library (doi set,
+//     postId null) — the accessibility feature has to reach the high-traffic search tier,
+//     not just promoted papers.
+// The DOI key doubles as the cache: a second viewer clicking "Chew on this" on the same
+// paper reuses the stored one instead of paying for another Claude call, and promoting
+// the paper later just attaches this row to the new Post rather than regenerating it.
 model ResearchExplainer {
   id         String   @id @default(cuid())
-  postId     String   @unique
-  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId     String?  @unique
+  post       Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  doi        String?  @unique
+  // The tiers of "Chew on this", cheapest first. All five come back from one generation
+  // call (see lib/explainer.ts) — a TL;DR that costs a separate request per paper would
+  // undo the caching this table exists for.
+  //
+  // Nullable because rows generated before tiering existed have neither; the UI shows what
+  // it has and nothing collapses when they're absent.
+  tldr            String?
+  keyFindingsJson String?
   summary    String
   termsJson  String
   quizJson   String
@@ -247,8 +404,151 @@ model Comment {
   replies   Comment[] @relation("Replies")
 
   votes     CommentVote[]
+  notifications Notification[]
 
   @@index([postId])
+}
+
+enum NotificationType {
+  COMMENT_ON_POST
+  REPLY_TO_COMMENT
+  COMMENT_ON_TRACKED_PAPER
+}
+
+// In-app notifications, deliberately narrow: something happened on a paper this user is
+// actually involved with — one they submitted, a comment they wrote, or a paper on their
+// Board. Vote-count notifications are gone; engagement volume isn't what this product is
+// trying to grow.
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  userId    String
+  user      User             @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Who triggered it. Null for aggregated vote notifications, which represent many people.
+  actorId   String?
+  actor     User?            @relation("NotificationActor", fields: [actorId], references: [id])
+
+  postId    String?
+  post      Post?            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId String?
+  comment   Comment?         @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+}
+
+// ---------------------------------------------------------------------------
+// The Board — a private, per-user canvas. This is what "saving" a paper now means:
+// a card lands on your board rather than on a flat bookmark list.
+//
+// Naming note: these are Canvas* rather than Board* because this schema's `Board` model
+// is the *Field* (the topic a paper is filed under, rendered as "F~slug"). One `Board`
+// row is a Field; one user's set of CanvasCards is their Board. Renaming the older model
+// would touch most of the app, so the collision is documented here instead.
+// ---------------------------------------------------------------------------
+
+// One card on one user's board. Points either at a Post in the library, or — when the
+// paper was added straight from live search and was never imported — carries enough
+// metadata inline to render the card without the paper existing in the database.
+model CanvasCard {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  postId String?
+  post   Post?  @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  externalDoi     String?
+  externalTitle   String?
+  externalAuthors String?
+  externalVenue   String?
+  externalYear    Int?
+  externalUrl     String?
+
+  // The user's own sticky note: why this paper matters to them, or what they took from
+  // it. Empty by default — a blank note is a card nobody has done the work on yet.
+  note String @default("")
+
+  // Position on the canvas, in canvas pixels from the top-left. Set to the next free grid
+  // slot when the card is created (see placement in lib/actions/board.ts) and updated on
+  // drop.
+  x Float @default(0)
+  y Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  linksFrom CanvasLink[] @relation("LinkFrom")
+  linksTo   CanvasLink[] @relation("LinkTo")
+
+  // Postgres, like SQLite before it, treats NULLs as distinct in a unique index — so each
+  // of these constrains only the rows that actually carry the column: one card per paper
+  // per board, whichever tier it came from, and any number of the other kind.
+  @@unique([userId, postId])
+  @@unique([userId, externalDoi])
+  @@index([userId])
+}
+
+// A line the user drew between two of their own cards, with their own label for what the
+// relationship is ("contradicts", "builds on", "same method", or anything they type).
+// This is the one deliberately effortful interaction in the product and the reason the
+// Board exists: the synthesis is the user's, not the model's.
+model CanvasLink {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fromCardId String
+  fromCard   CanvasCard @relation("LinkFrom", fields: [fromCardId], references: [id], onDelete: Cascade)
+  toCardId   String
+  toCard     CanvasCard @relation("LinkTo", fields: [toCardId], references: [id], onDelete: Cascade)
+
+  label     String   @default("")
+  createdAt DateTime @default(now())
+
+  // Connections are undirected in the UI, so the pair is normalised (lower id first)
+  // before writing — otherwise A→B and B→A would both be storable as separate lines.
+  @@unique([fromCardId, toCardId])
+  @@index([userId])
+}
+
+// What a person actually did with a paper, as opposed to what they clicked on the site.
+//   SOURCE_CLICK       — followed the link out to the original source
+//   COMPREHENSION_PASS — answered every question in that paper's "Chew on this" check
+// Two jobs: it's the product's headline metric (did this get someone to the real paper?),
+// and it's what earns a comment its "read the source" marker and its ranking weight.
+// One row per user per paper per kind — this records *whether* someone did the work, not
+// how many times; repeat events are still counted in lib/metrics.
+model PaperEngagement {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Papers in the library key on postId; live-search papers only ever have a DOI.
+  postId String?
+  post   Post?  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  doi    String?
+
+  kind EngagementKind
+
+  // True when the click-through followed an opened "Chew on this" summary in the same
+  // sitting — the specific path the product is trying to create, as distinct from someone
+  // clicking the source link straight off the page.
+  afterExplainer Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId, kind])
+  @@unique([userId, doi, kind])
+  @@index([postId, kind])
+}
+
+enum EngagementKind {
+  SOURCE_CLICK
+  COMPREHENSION_PASS
 }
 
 model Vote {

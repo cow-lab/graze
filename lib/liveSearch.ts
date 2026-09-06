@@ -13,25 +13,45 @@ export type LiveSearchResult = {
   year: number | null;
   citationCount: number;
   doi: string | null;
+  // Whether a free-to-read version exists anywhere, per OpenAlex's `is_oa`.
+  isOpenAccess: boolean;
+  // ISO 639-1 code of the work's original language, when OpenAlex reports one.
+  language: string | null;
+  // The source's own work type. Live search deliberately does not filter preprints out —
+  // the whole literature is the point of this tier — so the type is carried through and
+  // shown on the result instead.
+  workType: string | null;
+  // The free full text, when there is one. Kept strictly separate from `landingUrl` —
+  // previously the two were collapsed with `??`, which meant a paywalled work's publisher
+  // page masqueraded as an open-access link.
   oaUrl: string | null;
+  // The publisher's page for the work. May well be paywalled.
+  landingUrl: string | null;
   abstract: string | null;
 };
 
 type OpenAlexWork = {
   title?: string;
   doi?: string;
+  type?: string;
+  type_crossref?: string;
   publication_year?: number;
   cited_by_count?: number;
   abstract_inverted_index?: Record<string, number[]>;
   authorships?: { author: { display_name?: string } }[];
-  open_access?: { oa_url?: string | null };
+  language?: string | null;
+  open_access?: { is_oa?: boolean; oa_url?: string | null };
   primary_location?: {
     landing_page_url?: string;
     source?: { display_name?: string; issn_l?: string; host_organization_name?: string };
   };
 };
 
-export async function searchLiterature(query: string, page = 1): Promise<LiveSearchResult[]> {
+export async function searchLiterature(
+  query: string,
+  page = 1,
+  opts: { openAccessOnly?: boolean } = {},
+): Promise<LiveSearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
@@ -40,6 +60,9 @@ export async function searchLiterature(query: string, page = 1): Promise<LiveSea
   url.searchParams.set("per-page", "20");
   url.searchParams.set("page", String(page));
   url.searchParams.set("mailto", "graze-search@example.com");
+  // Filter at the API rather than post-hoc, so an open-access-only search still returns a
+  // full page of results instead of a page thinned out by client-side filtering.
+  if (opts.openAccessOnly) url.searchParams.set("filter", "is_oa:true");
 
   const res = await fetch(url.toString());
   if (!res.ok) throw new Error(`OpenAlex search failed (${res.status})`);
@@ -48,6 +71,7 @@ export async function searchLiterature(query: string, page = 1): Promise<LiveSea
 
   return items.map((item) => {
     const source = item.primary_location?.source;
+    const oaUrl = item.open_access?.oa_url ?? null;
     return {
       title: item.title?.trim() ?? "Untitled",
       authors:
@@ -61,7 +85,11 @@ export async function searchLiterature(query: string, page = 1): Promise<LiveSea
       year: item.publication_year ?? null,
       citationCount: item.cited_by_count ?? 0,
       doi: normalizeDoi(item.doi),
-      oaUrl: item.open_access?.oa_url ?? item.primary_location?.landing_page_url ?? null,
+      isOpenAccess: item.open_access?.is_oa ?? Boolean(oaUrl),
+      language: item.language ?? null,
+      workType: item.type_crossref ?? item.type ?? null,
+      oaUrl,
+      landingUrl: item.primary_location?.landing_page_url ?? null,
       abstract: reconstructOpenAlexAbstract(item.abstract_inverted_index),
     };
   });

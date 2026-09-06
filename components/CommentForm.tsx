@@ -35,7 +35,11 @@ export default function CommentForm({
         required
         autoFocus={autoFocus}
         rows={parentId ? 2 : 3}
-        placeholder={parentId ? "Write a reply…" : "Join the discussion…"}
+        placeholder={
+          parentId
+            ? "Write a reply…"
+            : "What does this paper actually say? What did the summary miss? Which part is worth reading?"
+        }
         className="bg-panel-2 border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-1 focus:ring-moss resize-y"
       />
       <label className="flex items-center gap-1.5 text-xs text-fg-muted w-fit cursor-pointer">
@@ -47,7 +51,7 @@ export default function CommentForm({
         <button
           type="submit"
           disabled={pending}
-          className="px-3 py-1.5 rounded-md bg-moss text-ink text-xs font-medium hover:brightness-110 transition disabled:opacity-60"
+          className="px-3 py-1.5 rounded-md bg-moss text-white text-xs font-medium hover:brightness-110 transition disabled:opacity-60"
         >
           {pending ? "Posting…" : parentId ? "Reply" : "Comment"}
         </button>

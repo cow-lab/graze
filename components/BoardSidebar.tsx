@@ -3,32 +3,42 @@ import { Users, TrendingUp, Plus, Sparkles } from "lucide-react";
 import { getSidebarFields, getHerdStats } from "@/lib/posts";
 import ReportFieldForm from "@/components/ReportFieldForm";
 import MobileFieldsDrawer from "@/components/MobileFieldsDrawer";
+import FieldLabel from "@/components/FieldLabel";
 
 type SidebarField = Awaited<ReturnType<typeof getSidebarFields>>["active"][number];
 
+// A long slug (e.g. a Combine-suggested "MembraneSeparationAndGasTransport") has no
+// natural break point, so it would otherwise blow straight out of the fixed-width
+// sidebar. FieldLabel adds wrap opportunities so the whole name stays legible over two
+// lines rather than being cut off. `min-w-0` is what actually lets the flex child shrink
+// below its content width, and `shrink-0` pins the count so it can't be pushed out.
 function FieldRow({ board, activeSlug }: { board: SidebarField; activeSlug?: string }) {
   return (
-    <div>
-      <div className="flex items-center gap-1">
-        <Link
-          href={`/?board=${board.slug}`}
-          className={`flex-1 flex items-center justify-between px-2 py-1.5 rounded text-sm transition-colors ${
-            activeSlug === board.slug
-              ? "bg-panel-2 text-ink"
-              : "text-fg-muted hover:text-ink hover:bg-panel-2/60"
-          }`}
-        >
-          <span className="flex items-center gap-1">
-            F~{board.slug}
-            {board.isAiSuggested && (
-              <Sparkles size={10} className="text-teal shrink-0" aria-label="Suggested by The Combine" />
-            )}
-          </span>
-          <span className="font-mono text-[10px] text-fg-muted">{board._count.posts}</span>
-        </Link>
-      </div>
-      <ReportFieldForm boardId={board.id} />
-    </div>
+    <Link
+      href={`/?board=${board.slug}`}
+      title={board.name}
+      className={`flex items-start justify-between gap-2 px-2 py-1.5 rounded text-sm transition-colors ${
+        activeSlug === board.slug
+          ? "bg-panel-2 text-ink"
+          : "text-fg-muted hover:text-ink hover:bg-panel-2/60"
+      }`}
+    >
+      <span className="min-w-0">
+        <FieldLabel slug={board.slug} />
+        {board.isAiSuggested && (
+          <Sparkles
+            size={10}
+            // Inline (not a flex sibling) so it trails the last word when the label
+            // wraps, instead of floating against the middle of the wrapped block.
+            className="text-teal inline-block align-middle ml-1"
+            aria-label="Suggested by The Combine"
+          aria-hidden="true" />
+        )}
+      </span>
+      <span className="font-mono text-[10px] text-fg-muted shrink-0 mt-0.5">
+        {board._count.posts}
+      </span>
+    </Link>
   );
 }
 
@@ -56,7 +66,7 @@ export default async function BoardSidebar({ activeSlug }: { activeSlug?: string
           href="/fields/new"
           className="flex items-center gap-1.5 px-2 py-1.5 rounded text-sm text-moss hover:bg-panel-2/60 transition-colors mt-1"
         >
-          <Plus size={13} /> New Field
+          <Plus size={13} aria-hidden="true" /> New Field
         </Link>
       </nav>
 
@@ -78,18 +88,22 @@ export default async function BoardSidebar({ activeSlug }: { activeSlug?: string
 
       <div className="mt-4 pt-3 border-t border-border flex flex-col gap-1.5">
         <div className="flex items-center gap-1.5 text-[11px] text-fg-muted">
-          <Users size={12} />
+          <Users size={12} aria-hidden="true" />
           {stats.inTheHerd.toLocaleString()} in the herd
         </div>
         <div className="flex items-center gap-1.5 text-[11px] text-fg-muted">
-          <TrendingUp size={12} />
+          <TrendingUp size={12} aria-hidden="true" />
           {stats.grazingThisMonth.toLocaleString()} grazing this month
         </div>
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-border">
+        <ReportFieldForm fields={[...active, ...provisional].map((b) => ({ id: b.id, slug: b.slug }))} />
       </div>
     </>
   );
 
-  const activeLabel = activeSlug ? `F~${activeSlug}` : "All fields";
+  const activeLabel = activeSlug ? <FieldLabel slug={activeSlug} /> : "All fields";
 
   return (
     <>

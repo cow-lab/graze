@@ -1,49 +1,87 @@
-import Link from "next/link";
 import { Sparkles } from "lucide-react";
-import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { requireAdminUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { PROMOTION_DISTINCT_AUTHOR_THRESHOLD } from "@/lib/fieldConstants";
-import { PromoteFieldButton, SuspendFieldButton, DismissReportsButton } from "@/components/FieldAdminActions";
+import {
+  PromoteFieldButton,
+  SuspendFieldButton,
+  ArchiveFieldButton,
+  RestoreFieldButton,
+  DismissReportsButton,
+} from "@/components/FieldAdminActions";
+import AdminNav from "@/components/AdminNav";
+import SectionHeading from "@/components/SectionHeading";
+import EmptyState from "@/components/EmptyState";
 
 export default async function AdminFieldsPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  await requireAdminUser();
 
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!user || user.role !== "ADMIN") redirect("/");
+  const withPostCount = {
+    _count: { select: { posts: { where: { post: { status: "PUBLISHED" as const } } } } },
+  };
 
-  const [reportedBoards, provisionalBoards] = await Promise.all([
-    prisma.board.findMany({
-      where: { reports: { some: {} } },
-      include: {
-        reports: { include: { reporter: { select: { name: true } } }, orderBy: { createdAt: "desc" } },
-      },
-      orderBy: { name: "asc" },
-    }),
-    prisma.board.findMany({
-      where: { status: "PROVISIONAL" },
-      include: { posts: { where: { status: "PUBLISHED" }, select: { authorId: true } } },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+  const [reportedBoards, provisionalBoards, activeBoards, archivedBoards, suspendedBoards] =
+    await Promise.all([
+      prisma.board.findMany({
+        where: { reports: { some: {} } },
+        include: {
+          reports: {
+            include: { reporter: { select: { name: true } } },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+        orderBy: { name: "asc" },
+      }),
+      prisma.board.findMany({
+        where: { status: "PROVISIONAL" },
+        include: {
+          posts: {
+            where: { post: { status: "PUBLISHED" } },
+            select: { post: { select: { authorId: true } } },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      // Listed so there's something to archive — active Fields previously never appeared
+      // here at all, which left no way to retire one from the UI.
+      prisma.board.findMany({
+        where: { status: "ACTIVE" },
+        include: withPostCount,
+        orderBy: { name: "asc" },
+      }),
+      prisma.board.findMany({
+        where: { status: "ARCHIVED" },
+        include: withPostCount,
+        orderBy: { name: "asc" },
+      }),
+      // Listed unconditionally, not just while reports exist. Suspended Fields are hidden
+      // from the sidebar, the Field picker and The Combine, so without their own section a
+      // suspension became a dead end the moment its reports were dismissed.
+      prisma.board.findMany({
+        where: { status: "SUSPENDED" },
+        include: withPostCount,
+        orderBy: { name: "asc" },
+      }),
+    ]);
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="font-heading text-2xl font-semibold mb-1">Field administration</h1>
-      <p className="text-sm text-fg-muted mb-8">
-        Fields don&apos;t need approval to be created — the real spam defense is that a
-        Field only reaches the main sidebar once posts from{" "}
-        {PROMOTION_DISTINCT_AUTHOR_THRESHOLD} distinct people land in it. This page is just
-        the backstop: reports, and a manual override if you want to skip ahead.
-      </p>
+      <div className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm mb-8">
+        <h1 className="font-heading text-2xl font-semibold mb-1">Field administration</h1>
+        <p className="text-sm text-fg-muted">
+          Fields don&apos;t need approval to be created — the real spam defense is that a
+          Field only reaches the main sidebar once posts from{" "}
+          {PROMOTION_DISTINCT_AUTHOR_THRESHOLD} distinct people land in it. This page is just
+          the backstop: reports, and a manual override if you want to skip ahead.
+        </p>
+      </div>
 
       <section className="mb-10">
-        <h2 className="font-heading text-base font-semibold mb-3">
-          Reported Fields {reportedBoards.length > 0 && `(${reportedBoards.length})`}
-        </h2>
+        <SectionHeading
+          title={`Reported Fields${reportedBoards.length > 0 ? ` (${reportedBoards.length})` : ""}`}
+        />
         {reportedBoards.length === 0 ? (
-          <p className="text-sm text-fg-muted">Nothing reported right now.</p>
+          <EmptyState>Nothing reported right now.</EmptyState>
         ) : (
           <div className="flex flex-col gap-3">
             {reportedBoards.map((board) => (
@@ -62,7 +100,11 @@ export default async function AdminFieldsPage() {
                     <p className="text-sm text-fg-muted mt-0.5">{board.description}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {board.status !== "SUSPENDED" && <SuspendFieldButton boardId={board.id} />}
+                    {board.status === "SUSPENDED" ? (
+                      <RestoreFieldButton boardId={board.id} />
+                    ) : (
+                      <SuspendFieldButton boardId={board.id} />
+                    )}
                     <DismissReportsButton boardId={board.id} />
                   </div>
                 </div>
@@ -80,15 +122,15 @@ export default async function AdminFieldsPage() {
       </section>
 
       <section>
-        <h2 className="font-heading text-base font-semibold mb-3">
-          Provisional Fields {provisionalBoards.length > 0 && `(${provisionalBoards.length})`}
-        </h2>
+        <SectionHeading
+          title={`Provisional Fields${provisionalBoards.length > 0 ? ` (${provisionalBoards.length})` : ""}`}
+        />
         {provisionalBoards.length === 0 ? (
-          <p className="text-sm text-fg-muted">None right now.</p>
+          <EmptyState>None right now.</EmptyState>
         ) : (
           <div className="flex flex-col gap-3">
             {provisionalBoards.map((board) => {
-              const distinctPosters = new Set(board.posts.map((p) => p.authorId)).size;
+              const distinctPosters = new Set(board.posts.map((p) => p.post.authorId)).size;
               return (
                 <div
                   key={board.id}
@@ -100,7 +142,7 @@ export default async function AdminFieldsPage() {
                         F~{board.slug}
                         {board.isAiSuggested && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-teal/30 bg-teal/15 text-teal font-mono text-[10px] uppercase tracking-wide">
-                            <Sparkles size={10} /> Combine-suggested
+                            <Sparkles size={10} aria-hidden="true" /> Combine-suggested
                           </span>
                         )}
                       </h3>
@@ -109,7 +151,10 @@ export default async function AdminFieldsPage() {
                         {distinctPosters}/{PROMOTION_DISTINCT_AUTHOR_THRESHOLD} distinct posters
                       </p>
                     </div>
-                    <PromoteFieldButton boardId={board.id} />
+                    <div className="flex items-center gap-2">
+                      <PromoteFieldButton boardId={board.id} />
+                      <ArchiveFieldButton boardId={board.id} />
+                    </div>
                   </div>
                 </div>
               );
@@ -118,19 +163,100 @@ export default async function AdminFieldsPage() {
         )}
       </section>
 
-      <p className="text-xs text-fg-muted mt-8">
-        <Link href="/admin/queue" className="text-moss hover:underline">
-          Moderation queue
-        </Link>{" "}
-        ·{" "}
-        <Link href="/admin/duplicates" className="text-moss hover:underline">
-          Possible duplicates
-        </Link>{" "}
-        ·{" "}
-        <Link href="/" className="text-moss hover:underline">
-          Back to feed
-        </Link>
-      </p>
+      <section className="mt-10">
+        <SectionHeading
+          title={`Active Fields${activeBoards.length > 0 ? ` (${activeBoards.length})` : ""}`}
+          description="Live in the sidebar and open to new posts. Archive one to retire it in good standing; suspend one only as a moderation action."
+        />
+        {activeBoards.length === 0 ? (
+          <EmptyState>No active Fields yet.</EmptyState>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {activeBoards.map((board) => (
+              <div
+                key={board.id}
+                className="bg-panel/95 border border-border-strong rounded-lg p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="font-heading text-base font-semibold">F~{board.slug}</h3>
+                    <p className="text-sm text-fg-muted mt-0.5">{board.description}</p>
+                    <p className="text-xs text-fg-muted mt-1 font-mono">
+                      {board._count.posts} published post{board._count.posts === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ArchiveFieldButton boardId={board.id} />
+                    <SuspendFieldButton boardId={board.id} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-10">
+        <SectionHeading
+          title={`Archived Fields${archivedBoards.length > 0 ? ` (${archivedBoards.length})` : ""}`}
+          description="Retired, but not hidden — existing posts stay readable and keep appearing in the feed. They're out of the sidebar and the Field picker, and The Combine no longer feeds them."
+        />
+        {archivedBoards.length === 0 ? (
+          <EmptyState>Nothing archived right now.</EmptyState>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {archivedBoards.map((board) => (
+              <div
+                key={board.id}
+                className="bg-panel/95 border border-border-strong rounded-lg p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="font-heading text-base font-semibold">F~{board.slug}</h3>
+                    <p className="text-sm text-fg-muted mt-0.5">{board.description}</p>
+                    <p className="text-xs text-fg-muted mt-1 font-mono">
+                      {board._count.posts} published post{board._count.posts === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <RestoreFieldButton boardId={board.id} label="Unarchive" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-10">
+        <SectionHeading
+          title={`Suspended Fields${suspendedBoards.length > 0 ? ` (${suspendedBoards.length})` : ""}`}
+          description="Hidden from the sidebar, the Field picker and The Combine. Restoring one sends it back through the traction gate — it returns to the main list straight away if it already has enough distinct posters."
+        />
+        {suspendedBoards.length === 0 ? (
+          <EmptyState>Nothing suspended right now.</EmptyState>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {suspendedBoards.map((board) => (
+              <div
+                key={board.id}
+                className="bg-panel/95 border border-border-strong rounded-lg p-4 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="font-heading text-base font-semibold">F~{board.slug}</h3>
+                    <p className="text-sm text-fg-muted mt-0.5">{board.description}</p>
+                    <p className="text-xs text-fg-muted mt-1 font-mono">
+                      {board._count.posts} published post{board._count.posts === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <RestoreFieldButton boardId={board.id} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <AdminNav />
     </div>
   );
 }

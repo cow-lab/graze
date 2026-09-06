@@ -1,6 +1,5 @@
 import Link from "next/link";
 import CowAvatar from "@/components/CowAvatar";
-import VerifiedBadge from "@/components/VerifiedBadge";
 
 // Renders wherever an author's name shows — post cards, comments, post detail. Handles
 // the anonymous case itself so callers never have to branch on it: pass the real author
@@ -8,14 +7,12 @@ import VerifiedBadge from "@/components/VerifiedBadge";
 export default function AuthorDisplay({
   userId,
   name,
-  hasVerifiedAffiliation,
   isAnonymous,
   cowNumber,
   linkToProfile = true,
 }: {
   userId: string;
   name: string;
-  hasVerifiedAffiliation: boolean;
   isAnonymous: boolean;
   cowNumber: number | null;
   linkToProfile?: boolean;
@@ -30,7 +27,7 @@ export default function AuthorDisplay({
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-center">
       {linkToProfile ? (
         <Link href={`/profile/${userId}`} className="hover:text-ink transition-colors">
           {name}
@@ -38,7 +35,6 @@ export default function AuthorDisplay({
       ) : (
         <span>{name}</span>
       )}
-      {hasVerifiedAffiliation && <VerifiedBadge />}
     </span>
   );
 }

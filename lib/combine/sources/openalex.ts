@@ -12,8 +12,14 @@ type OpenAlexLocation = {
 type OpenAlexWork = {
   title?: string;
   doi?: string;
+  // OpenAlex's own type ("article", "preprint", …) and the Crossref type it mirrors
+  // ("journal-article", "posted-content"). The Crossref one is the publisher's own
+  // declaration, so it's preferred when present.
+  type?: string;
+  type_crossref?: string;
   publication_year?: number;
   cited_by_count?: number;
+  language?: string | null;
   abstract_inverted_index?: Record<string, number[]>;
   authorships?: { author: { display_name?: string } }[];
   primary_location?: OpenAlexLocation;
@@ -75,7 +81,9 @@ export async function searchOpenAlex(keywords: string[], limit = 5): Promise<Com
           url: best?.landing_page_url ?? (item.doi ?? ""),
           sourceName: "OpenAlex" as const,
           citationCount: item.cited_by_count ?? null,
+          language: item.language ?? null,
           topics: (item.topics ?? []).map((t) => t.display_name).filter((t): t is string => !!t),
+          workType: item.type_crossref ?? item.type ?? null,
           version: stillPreprintOnly ? "preprint" : best?.version ? "published" : null,
         };
       });

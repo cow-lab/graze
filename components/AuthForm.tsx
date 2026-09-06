@@ -11,12 +11,16 @@ type Field = {
 };
 
 export default function AuthForm({
+  title,
+  subtitle,
   action,
   fields,
   submitLabel,
   altHref,
   altLabel,
 }: {
+  title: string;
+  subtitle?: string;
   action: (prevState: string | undefined, formData: FormData) => Promise<string | undefined>;
   fields: Field[];
   submitLabel: string;
@@ -28,6 +32,10 @@ export default function AuthForm({
   return (
     <div className="max-w-sm mx-auto mt-8">
       <div className="bg-panel/95 border border-border-strong rounded-lg p-6 shadow-sm">
+        <h1 className={`font-heading text-2xl font-semibold text-center ${subtitle ? "mb-1" : "mb-4"}`}>
+          {title}
+        </h1>
+        {subtitle && <p className="text-center text-sm text-fg-muted mb-4">{subtitle}</p>}
         <form action={formAction} className="flex flex-col gap-4">
           {fields.map((field) => (
             <div key={field.name} className="flex flex-col gap-1.5">
@@ -50,17 +58,17 @@ export default function AuthForm({
           <button
             type="submit"
             disabled={pending}
-            className="mt-2 px-4 py-2 rounded-md bg-moss text-ink text-sm font-medium hover:brightness-110 transition disabled:opacity-60"
+            className="mt-2 px-4 py-2 rounded-md bg-moss text-white text-sm font-medium hover:brightness-110 transition disabled:opacity-60"
           >
             {pending ? "Please wait…" : submitLabel}
           </button>
         </form>
+        <p className="text-center mt-4 pt-4 border-t border-border text-sm text-fg-muted">
+          <Link href={altHref} className="text-moss hover:underline">
+            {altLabel}
+          </Link>
+        </p>
       </div>
-      <p className="text-center mt-4 text-sm text-fg-muted">
-        <Link href={altHref} className="hover:text-fg transition-colors">
-          {altLabel}
-        </Link>
-      </p>
     </div>
   );
 }

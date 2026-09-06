@@ -3,10 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/actions/auth";
 import { getUserReputation } from "@/lib/reputation";
 import { moderateFieldSubmission } from "@/lib/fieldModeration";
 import { PROMOTION_DISTINCT_AUTHOR_THRESHOLD } from "@/lib/fieldConstants";
+import { slugify } from "@/lib/slug";
+import { rankFields, MIN_SCORE_TO_SUGGEST } from "@/lib/fieldMatch";
+import { guard } from "@/lib/actions/result";
 
 // Soft friction, not a gatekeeper: a brand-new account can't spin up Fields, but there's
 // no approval queue and no admin in the loop for the common case. A few days old OR some
@@ -14,23 +17,21 @@ import { PROMOTION_DISTINCT_AUTHOR_THRESHOLD } from "@/lib/fieldConstants";
 const MIN_ACCOUNT_AGE_DAYS = 3;
 const MIN_REPUTATION_TO_BYPASS_AGE = 5;
 
-function slugify(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join("")
-    .replace(/[^a-zA-Z0-9]/g, "");
-}
-
 export async function createField(
   _prevState: string | undefined,
   formData: FormData,
 ): Promise<string | undefined> {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const result = await guard(
+    "Couldn't create that Field — nothing was saved. Try again in a moment.",
+    () => createFieldInner(formData),
+  );
+  return result.ok ? result.data : result.message;
+}
 
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: session.user.id } });
+async function createFieldInner(formData: FormData): Promise<string | undefined> {
+  const userId = await requireUserId();
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const accountAgeDays = (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24);
   if (accountAgeDays < MIN_ACCOUNT_AGE_DAYS) {
     const reputation = await getUserReputation(user.id);
@@ -55,6 +56,9 @@ export async function createField(
   const baseSlug = slugify(name);
   if (!baseSlug) return "That name doesn't produce a usable slug — try adding some letters.";
 
+  // Archived Fields are deliberately included here: a retired Field still reserves its
+  // name, so someone shouldn't be able to recreate it as a near-duplicate. Only suspended
+  // ones are excluded, since those shouldn't block a legitimate Field on the same topic.
   const existingFields = await prisma.board.findMany({
     where: { status: { not: "SUSPENDED" } },
     select: { slug: true, name: true, description: true },
@@ -83,13 +87,64 @@ export async function createField(
       name,
       description,
       searchKeywordsJson: JSON.stringify(keywords),
-      createdById: session.user.id,
+      createdById: userId,
       status: "PROVISIONAL",
     },
   });
 
+  await backfillExistingPapers(board);
+
   revalidatePath("/");
   redirect(`/?board=${board.slug}`);
+}
+
+// A new Field would otherwise open empty even when the library already holds papers that
+// obviously belong in it — and an empty Field can't cross the traction threshold that
+// promotes it out of "New fields". So its keywords run once against what's already here,
+// using the same matcher every other entry point uses.
+//
+// Capped rather than unbounded: this runs inline on Field creation, and matching a few
+// hundred recent papers is the difference between a Field that opens with something in it
+// and one that doesn't. Older papers still get picked up by the next Combine run.
+const BACKFILL_SCAN_LIMIT = 500;
+
+async function backfillExistingPapers(board: {
+  id: string;
+  slug: string;
+  name: string;
+  searchKeywordsJson: string;
+}): Promise<number> {
+  const papers = await prisma.post.findMany({
+    where: { status: "PUBLISHED" },
+    select: { id: true, title: true, abstract: true, field: true },
+    orderBy: { createdAt: "desc" },
+    take: BACKFILL_SCAN_LIMIT,
+  });
+
+  const matches = papers.filter(
+    (paper) =>
+      rankFields(
+        { title: paper.title, abstract: paper.abstract, venue: paper.field },
+        [board],
+        { minScore: MIN_SCORE_TO_SUGGEST, limit: 1 },
+      ).length > 0,
+  );
+
+  if (matches.length === 0) return 0;
+
+  await prisma.postField.createMany({
+    data: matches.map((paper) => ({
+      postId: paper.id,
+      boardId: board.id,
+      assignedBy: "BACKFILL" as const,
+    })),
+  });
+
+  console.log(
+    `[Fields] Backfilled ${matches.length} existing paper(s) into new Field F~${board.slug}.`,
+  );
+  await maybePromoteField(board.id);
+  return matches.length;
 }
 
 // Called after a post is created — if its Field is still PROVISIONAL and posts from enough
@@ -100,13 +155,13 @@ export async function maybePromoteField(boardId: string): Promise<void> {
   const board = await prisma.board.findUnique({ where: { id: boardId }, select: { status: true } });
   if (!board || board.status !== "PROVISIONAL") return;
 
-  const posters = await prisma.post.findMany({
-    where: { boardId, status: "PUBLISHED" },
-    select: { authorId: true },
-    distinct: ["authorId"],
+  const assignments = await prisma.postField.findMany({
+    where: { boardId, post: { status: "PUBLISHED" } },
+    select: { post: { select: { authorId: true } } },
   });
+  const posters = new Set(assignments.map((a) => a.post.authorId));
 
-  if (posters.length >= PROMOTION_DISTINCT_AUTHOR_THRESHOLD) {
+  if (posters.size >= PROMOTION_DISTINCT_AUTHOR_THRESHOLD) {
     await prisma.board.update({ where: { id: boardId }, data: { status: "ACTIVE" } });
     revalidatePath("/");
   }
@@ -116,8 +171,15 @@ export async function reportField(
   _prevState: string | undefined,
   formData: FormData,
 ): Promise<string | undefined> {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const result = await guard(
+    "Couldn't send that report. Try again in a moment.",
+    () => reportFieldInner(formData),
+  );
+  return result.ok ? result.data : result.message;
+}
+
+async function reportFieldInner(formData: FormData): Promise<string | undefined> {
+  const userId = await requireUserId();
 
   const boardId = String(formData.get("boardId") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
@@ -128,7 +190,7 @@ export async function reportField(
   if (!board) return "That Field doesn't exist.";
 
   await prisma.fieldReport.create({
-    data: { boardId, reporterId: session.user.id, reason },
+    data: { boardId, reporterId: userId, reason },
   });
 
   revalidatePath("/admin/fields");

@@ -32,7 +32,7 @@ export async function resolvePreprintDuplicate(
   if (!normalizedTitle) return null;
 
   const existingResearch = await prisma.post.findMany({
-    where: { type: "RESEARCH", status: { not: "REJECTED" } },
+    where: { status: { not: "REJECTED" } },
     select: { id: true, title: true, field: true, doi: true, citationCount: true },
     take: 1000,
   });

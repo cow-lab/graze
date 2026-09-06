@@ -1,17 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { fetchWithBackoff } from "@/lib/combine/fetchWithBackoff";
+import { isDoiRetracted } from "@/lib/combine/retractionWatch";
 
 export type RetractionCheckSummary = {
   checked: number;
   newlyRetracted: string[];
 };
 
-type CrossrefWorkLookup = {
-  message?: {
-    "update-to"?: { type?: string; DOI?: string }[];
-  };
-};
-
+// The periodic half of retraction checking. The other half runs at import time
+// (lib/combine/reliability.ts), so a paper already known to be retracted never enters the
+// library at all; this catches the ones retracted after they were imported.
+//
 // A lightweight, periodic re-sync — not real-time — against already-imported papers.
 // Every Combine-imported post has a DOI (it's the dedup key), and Crossref indexes
 // retraction notices for essentially the whole DOI space regardless of which source
@@ -22,20 +20,14 @@ export async function checkRetractions(): Promise<RetractionCheckSummary> {
   const summary: RetractionCheckSummary = { checked: 0, newlyRetracted: [] };
 
   const posts = await prisma.post.findMany({
-    where: { type: "RESEARCH", source: "COMBINE", doi: { not: null }, retractedAt: null },
+    where: { source: "COMBINE", doi: { not: null }, retractedAt: null },
     select: { id: true, doi: true, title: true },
   });
 
   for (const post of posts) {
     summary.checked += 1;
     try {
-      const res = await fetchWithBackoff(`https://api.crossref.org/works/${encodeURIComponent(post.doi!)}`);
-      if (!res.ok) continue;
-      const data = (await res.json()) as CrossrefWorkLookup;
-      const updates = data.message?.["update-to"] ?? [];
-      const isRetracted = updates.some((u) => (u.type ?? "").toLowerCase().includes("retraction"));
-
-      if (isRetracted) {
+      if (await isDoiRetracted(post.doi!)) {
         await prisma.post.update({ where: { id: post.id }, data: { retractedAt: new Date() } });
         summary.newlyRetracted.push(post.title);
       }

@@ -1,25 +1,66 @@
 import { prisma } from "@/lib/prisma";
-import type { PostType, VoteValue } from "@prisma/client";
+import type { Prisma, VoteValue } from "@prisma/client";
 
 export type PostListItem = Awaited<ReturnType<typeof getFeedPosts>>[number];
 
-// Verification now lives on affiliations, not the account — an author "has a verified
-// affiliation" if at least one of their listed affiliations passed the domain check.
 const authorSelect = {
   id: true,
   name: true,
   cowNumber: true,
-  _count: { select: { affiliations: { where: { verified: true } } } },
 } as const;
 
 const feedInclude = {
   author: { select: authorSelect },
-  board: { select: { slug: true, name: true } },
+  // Every Field this paper is filed under, not just one — see PostField in the schema.
+  fields: {
+    select: { board: { select: { slug: true, name: true } } },
+    orderBy: { board: { name: "asc" } },
+  },
   votes: { select: { value: true, userId: true } },
-  _count: { select: { comments: true, referencingPosts: true } },
+  // The glossary (so cards can underline known jargon) and the one-line TL;DR, which is the
+  // cheapest tier of "Chew on this" and the reason someone scanning a feed stops. Still not
+  // the whole explainer row — the summary, findings and quiz load when the panel opens.
+  explainer: { select: { termsJson: true, tldr: true } },
+  _count: { select: { comments: true } },
 } as const;
 
-export type SortOption = "hot" | "new" | "top";
+// Three orderings a person reading research would actually ask for. The time-decayed
+// "hot" score this replaces was built for a social engagement feed that no longer exists:
+// it ranked papers by how fast they were collecting votes, which says nothing about
+// whether a paper is worth reading.
+export type SortOption = "cited" | "discussed" | "new";
+
+export const DEFAULT_SORT: SortOption = "cited";
+
+export const SORT_LABELS: Record<SortOption, string> = {
+  cited: "Most cited",
+  discussed: "Most discussed",
+  new: "Newest",
+};
+
+export function parseSort(value: string | undefined): SortOption {
+  return value === "discussed" || value === "new" || value === "cited" ? value : DEFAULT_SORT;
+}
+
+// Posts from a SUSPENDED Field are withheld everywhere they'd otherwise be listed —
+// suspending spam is pointless if its posts keep surfacing in the feed and library.
+// ARCHIVED is deliberately not included: retiring a Field closes it to new posts but
+// leaves everything already in it readable.
+//
+// Now that a paper can sit in several Fields, "visible" means at least one of them isn't
+// suspended. Suspending a Field shouldn't disappear a paper that also belongs somewhere
+// legitimate — only a paper whose every Field has been suspended drops out.
+const VISIBLE_IN_SOME_FIELD = {
+  fields: { some: { board: { status: { not: "SUSPENDED" } } } },
+} as const;
+
+// Typed explicitly: returning a bare union of two object shapes made every `where` that
+// spreads it a union too, and Prisma's inferred result type came apart downstream.
+function inField(boardSlug: string | undefined): Prisma.PostWhereInput {
+  return boardSlug
+    ? { fields: { some: { board: { slug: boardSlug, status: { not: "SUSPENDED" } } } } }
+    : VISIBLE_IN_SOME_FIELD;
+}
 
 function withScore<T extends { votes: { value: VoteValue; userId: string }[] }>(
   post: T,
@@ -30,47 +71,43 @@ function withScore<T extends { votes: { value: VoteValue; userId: string }[] }>(
   return { ...post, score, userVote };
 }
 
-// Reddit/HN-style time-decayed ranking: raw vote count alone goes stale immediately and
-// never surfaces new content, so this is the default landing sort everywhere ("Top" — pure
-// all-time votes — and "New" — pure recency — stay as explicit, separate options).
-// Gravity 1.8 is within the standard 1.5-1.8 range; the +2 keeps a brand-new post's score
-// finite instead of dividing by a near-zero age.
-const HOT_GRAVITY = 1.8;
+// Rows arrive newest-first from the database, so recency is the tie-break for free and
+// "Newest" needs no work at all. A paper with no citation count yet (user-submitted, never
+// cross-referenced) sorts below every paper that has one rather than above them as a 0
+// would elsewhere — unknown isn't zero.
+function applySort<T extends { citationCount: number | null; _count: { comments: number }; createdAt: Date }>(
+  posts: T[],
+  sort: SortOption,
+): T[] {
+  if (sort === "new") return posts;
 
-function hotScore(score: number, createdAt: Date): number {
-  const hoursSincePost = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-  return score / Math.pow(hoursSincePost + 2, HOT_GRAVITY);
-}
+  if (sort === "discussed") {
+    return [...posts].sort(
+      (a, b) => b._count.comments - a._count.comments || b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+  }
 
-function applySort<T extends { score: number; createdAt: Date }>(posts: T[], sort: SortOption): T[] {
-  if (sort === "new") {
-    return posts; // already DB-ordered by createdAt desc
-  }
-  if (sort === "top") {
-    return [...posts].sort((a, b) => b.score - a.score || b.createdAt.getTime() - a.createdAt.getTime());
-  }
-  return [...posts].sort((a, b) => hotScore(b.score, b.createdAt) - hotScore(a.score, a.createdAt));
+  return [...posts].sort(
+    (a, b) => (b.citationCount ?? -1) - (a.citationCount ?? -1) || b.createdAt.getTime() - a.createdAt.getTime(),
+  );
 }
 
 export async function getFeedPosts(params: {
   boardSlug?: string;
-  type?: PostType;
   sort?: SortOption;
   viewerId?: string;
 }) {
-  const sort = params.sort ?? "hot";
   const posts = await prisma.post.findMany({
     where: {
-      board: params.boardSlug ? { slug: params.boardSlug } : undefined,
-      type: params.type,
+      ...inField(params.boardSlug),
       status: "PUBLISHED",
     },
     include: feedInclude,
-    orderBy: sort === "new" ? { createdAt: "desc" } : undefined,
+    orderBy: { createdAt: "desc" },
   });
 
   const withScores = posts.map((p) => withScore(p, params.viewerId));
-  return applySort(withScores, sort);
+  return applySort(withScores, params.sort ?? DEFAULT_SORT);
 }
 
 export async function getResearchPosts(params: {
@@ -79,11 +116,10 @@ export async function getResearchPosts(params: {
   sort?: SortOption;
   viewerId?: string;
 }) {
-  const sort = params.sort ?? "hot";
   const posts = await prisma.post.findMany({
     where: {
-      type: "RESEARCH",
       status: "PUBLISHED",
+      ...VISIBLE_IN_SOME_FIELD,
       field: params.field || undefined,
       OR: params.search
         ? [
@@ -95,11 +131,11 @@ export async function getResearchPosts(params: {
         : undefined,
     },
     include: feedInclude,
-    orderBy: sort === "new" ? { createdAt: "desc" } : undefined,
+    orderBy: { createdAt: "desc" },
   });
 
   const withScores = posts.map((p) => withScore(p, params.viewerId));
-  return applySort(withScores, sort);
+  return applySort(withScores, params.sort ?? DEFAULT_SORT);
 }
 
 export async function getPostDetail(id: string, viewerId?: string) {
@@ -107,20 +143,12 @@ export async function getPostDetail(id: string, viewerId?: string) {
     where: { id },
     include: {
       author: { select: authorSelect },
-      board: { select: { slug: true, name: true } },
+      fields: {
+        select: { board: { select: { slug: true, name: true } } },
+        orderBy: { board: { name: "asc" } },
+      },
       votes: { select: { value: true, userId: true } },
       explainer: true,
-      refPost: { select: { id: true, title: true, type: true } },
-      referencingPosts: {
-        select: {
-          id: true,
-          title: true,
-          createdAt: true,
-          isAnonymous: true,
-          author: { select: authorSelect },
-          votes: { select: { value: true } },
-        },
-      },
       _count: { select: { comments: true } },
     },
   });
@@ -128,12 +156,13 @@ export async function getPostDetail(id: string, viewerId?: string) {
   return withScore(post, viewerId);
 }
 
-// All postable Fields (active or still building traction) — used for the Field picker on
-// /submit and /search. Suspended Fields are excluded; you can't post into one.
+// Fields you can post into — used for the Field picker on /submit and /search. Archived
+// and suspended Fields are both excluded: an archived Field is readable but closed to new
+// contributions, which is the whole point of retiring one.
 export async function getBoardsWithCounts() {
   const boards = await prisma.board.findMany({
-    where: { status: { not: "SUSPENDED" } },
-    include: { _count: { select: { posts: { where: { status: "PUBLISHED" } } } } },
+    where: { status: { in: ["ACTIVE", "PROVISIONAL"] } },
+    include: { _count: { select: { posts: { where: { post: { status: "PUBLISHED" } } } } } },
     orderBy: { name: "asc" },
   });
   return boards;
@@ -145,7 +174,7 @@ export async function getBoardsWithCounts() {
 export async function getSidebarFields() {
   const boards = await prisma.board.findMany({
     where: { status: { in: ["ACTIVE", "PROVISIONAL"] } },
-    include: { _count: { select: { posts: { where: { status: "PUBLISHED" } } } } },
+    include: { _count: { select: { posts: { where: { post: { status: "PUBLISHED" } } } } } },
     orderBy: { name: "asc" },
   });
   return {

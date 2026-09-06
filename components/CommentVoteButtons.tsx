@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { voteOnComment } from "@/lib/actions/comments";
+import InlineError from "@/components/InlineError";
 import type { VoteValue } from "@prisma/client";
 
 export default function CommentVoteButtons({
@@ -21,6 +22,7 @@ export default function CommentVoteButtons({
 }) {
   const [optimisticScore, setOptimisticScore] = useState(score);
   const [optimisticVote, setOptimisticVote] = useState<VoteValue | null>(userVote);
+  const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const router = useRouter();
 
@@ -31,16 +33,23 @@ export default function CommentVoteButtons({
     }
 
     const prevVote = optimisticVote;
+    const prevScore = optimisticScore;
     let delta = 0;
     if (prevVote === value) delta = value === "UP" ? -1 : 1;
     else if (prevVote === null) delta = value === "UP" ? 1 : -1;
     else delta = value === "UP" ? 2 : -2;
 
-    setOptimisticScore(optimisticScore + delta);
+    setError(null);
+    setOptimisticScore(prevScore + delta);
     setOptimisticVote(prevVote === value ? null : value);
 
     startTransition(async () => {
-      await voteOnComment(commentId, postId, value);
+      const result = await voteOnComment(commentId, postId, value);
+      if (!result.ok) {
+        setOptimisticScore(prevScore);
+        setOptimisticVote(prevVote);
+        setError(result.message);
+      }
     });
   }
 
@@ -49,14 +58,17 @@ export default function CommentVoteButtons({
       <button
         type="button"
         onClick={() => handleVote("UP")}
-        aria-label="Upvote"
-        className={`leading-none transition-colors ${
+        aria-label="Upvote this comment"
+        aria-pressed={optimisticVote === "UP"}
+        className={`leading-none transition-colors rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${
           optimisticVote === "UP" ? "text-moss" : "text-fg-muted hover:text-moss"
         }`}
       >
-<ArrowUp size={13} />
+        <ArrowUp size={13} aria-hidden="true" />
       </button>
       <span
+        aria-live="polite"
+        aria-atomic="true"
         className={`tabular-nums ${
           optimisticVote === "UP"
             ? "text-moss"
@@ -65,18 +77,21 @@ export default function CommentVoteButtons({
               : "text-fg-muted"
         }`}
       >
+        <span className="sr-only">Score: </span>
         {optimisticScore}
       </span>
       <button
         type="button"
         onClick={() => handleVote("DOWN")}
-        aria-label="Downvote"
-        className={`leading-none transition-colors ${
+        aria-label="Downvote this comment"
+        aria-pressed={optimisticVote === "DOWN"}
+        className={`leading-none transition-colors rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${
           optimisticVote === "DOWN" ? "text-rose" : "text-fg-muted hover:text-rose"
         }`}
       >
-<ArrowDown size={13} />
+        <ArrowDown size={13} aria-hidden="true" />
       </button>
+      <InlineError message={error} />
     </div>
   );
 }

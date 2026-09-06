@@ -11,7 +11,7 @@ const ModerationSchema = z.object({
 
 export type FieldModerationResult = z.infer<typeof ModerationSchema>;
 
-const SYSTEM_PROMPT = `You screen new "Field" submissions for a community marketplace site (Graze) before they're created. A Field is a topic community (e.g. "Robotics", "Climate"). You are given the proposed Field's name and description, plus a list of existing Fields (slug + name + description).
+const SYSTEM_PROMPT = `You screen new "Field" submissions for a research library (Graze) before they're created. A Field is a topic community (e.g. "Robotics", "Climate"). You are given the proposed Field's name and description, plus a list of existing Fields (slug + name + description).
 
 This is a fast, synchronous, inline check — not a full moderation review. Only flag things a reasonable person would flag instantly:
 - isDuplicate: true only if the new Field clearly overlaps an EXISTING one in subject matter (e.g. "AI" when "Artificial Intelligence" already exists, or "Climate Change" when "Climate" already exists). Different, more specific, or adjacent topics are NOT duplicates — err toward allowing legitimate niche topics through. If true, set duplicateOfSlug to that existing Field's slug.

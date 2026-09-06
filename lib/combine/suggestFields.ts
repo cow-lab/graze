@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { CombineCandidate } from "@/lib/combine/types";
+import { slugify } from "@/lib/slug";
 
 // If a topic shows up across at least this many candidates in one run, and doesn't match
 // any existing Field, it's worth proposing as a new one.
@@ -33,7 +34,7 @@ const ZERO_USAGE: TokenUsage = { inputTokens: 0, outputTokens: 0 };
 function placeholderProposal(topic: string) {
   return {
     name: topic,
-    description: `Research and problems related to ${topic}, surfaced automatically because several unmatched papers on this topic showed up in one Combine run.`,
+    description: `Research related to ${topic}, surfaced automatically because several unmatched papers on this topic showed up in one Combine run.`,
     keywords: [topic],
   };
 }
@@ -48,7 +49,7 @@ async function draftFieldProposal(topic: string, exampleTitles: string[]) {
       model: "claude-opus-5",
       max_tokens: 512,
       system:
-        "You draft a proposed new topic Field for a research/problems community site, given a topic label and a few example paper titles that fall under it. Produce a short, clear Field name (2-4 words, title case), a one-sentence description of what belongs in this Field, and 3-6 search keywords The Combine can use to keep finding relevant papers for it.",
+        "You draft a proposed new topic Field for a research library, given a topic label and a few example paper titles that fall under it. Produce a short, clear Field name (2-4 words, title case), a one-sentence description of what belongs in this Field, and 3-6 search keywords The Combine can use to keep finding relevant papers for it.",
       messages: [
         {
           role: "user",
@@ -67,15 +68,6 @@ async function draftFieldProposal(topic: string, exampleTitles: string[]) {
     console.error("Combine: field proposal drafting failed, falling back to placeholder:", err);
     return { proposal: placeholderProposal(topic), isDemo: true, usage: ZERO_USAGE };
   }
-}
-
-function slugify(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join("")
-    .replace(/[^a-zA-Z0-9]/g, "");
 }
 
 export type FieldSuggestionSummary = {

@@ -53,6 +53,7 @@ export async function searchCrossref(keywords: string[], limit = 5): Promise<Com
           year: item.published?.["date-parts"]?.[0]?.[0] ?? null,
           url: item.URL ?? (item.DOI ? `https://doi.org/${item.DOI}` : ""),
           sourceName: "Crossref" as const,
+          workType: item.type ?? null,
           citationCount: item["is-referenced-by-count"] ?? null,
         };
       });

@@ -3,6 +3,8 @@
 import { useState, useTransition } from "react";
 import { ShieldAlert } from "lucide-react";
 import { checkRetractionsAction } from "@/lib/actions/admin";
+import InlineError from "@/components/InlineError";
+import Spinner from "@/components/Spinner";
 import type { RetractionCheckSummary } from "@/lib/combine/retractions";
 
 export default function CheckRetractionsButton() {
@@ -12,13 +14,11 @@ export default function CheckRetractionsButton() {
 
   function handleClick() {
     setError(null);
+    setSummary(null);
     startTransition(async () => {
-      try {
-        const result = await checkRetractionsAction();
-        setSummary(result);
-      } catch {
-        setError("Retraction check failed — check the server logs.");
-      }
+      const result = await checkRetractionsAction();
+      if (result.ok) setSummary(result.data);
+      else setError(result.message);
     });
   }
 
@@ -30,10 +30,15 @@ export default function CheckRetractionsButton() {
         disabled={isPending}
         className="flex items-center gap-1.5 px-4 py-2 rounded-md border border-border-strong text-sm font-medium hover:bg-ink/5 transition disabled:opacity-60"
       >
-        <ShieldAlert size={14} />
+        {isPending ? <Spinner /> : <ShieldAlert size={14} aria-hidden="true" />}
         {isPending ? "Checking retractions…" : "Check for retractions"}
       </button>
-      {error && <p className="text-xs text-rose">{error}</p>}
+      {isPending && (
+        <p role="status" aria-live="polite" className="text-xs text-fg-muted">
+          Re-checking every imported paper against Crossref — this takes a moment.
+        </p>
+      )}
+      <InlineError message={error} />
       {summary && !isPending && (
         <p className="text-xs text-fg-muted font-mono">
           Checked {summary.checked} imported papers against Crossref

@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-import { promoteCandidate, type PromoteOutcome } from "@/lib/combine/run";
+import { requireUserId } from "@/lib/actions/auth";
+import { promoteCandidate, type FieldAssignment, type PromoteOutcome } from "@/lib/combine/run";
+import { captureError } from "@/lib/errorReporting";
 import type { LiveSearchResult } from "@/lib/liveSearch";
 
 // "Add to Graze" on a live search result — any signed-in user can do this (not
@@ -16,14 +16,41 @@ import type { LiveSearchResult } from "@/lib/liveSearch";
 // silent rejection.
 export async function promoteToGraze(
   result: LiveSearchResult,
-  boardSlug: string,
+  boardSlugs: string[],
+  // Which of the chosen Fields the matcher proposed, so the assignment records how it was
+  // made rather than crediting all of them to the person who clicked.
+  suggestedSlugs: string[] = [],
 ): Promise<PromoteOutcome | { status: "error"; message: string }> {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const userId = await requireUserId();
 
-  const board = await prisma.board.findUnique({ where: { slug: boardSlug } });
-  if (!board) return { status: "error", message: "Choose a Field first." };
+  const boards = await prisma.board.findMany({
+    where: { slug: { in: boardSlugs }, status: { in: ["ACTIVE", "PROVISIONAL"] } },
+    select: { id: true, slug: true },
+  });
+  if (boards.length === 0) return { status: "error", message: "Pick at least one Field first." };
 
+  const suggested = new Set(suggestedSlugs);
+  const assignments: FieldAssignment[] = boards.map((board) => ({
+    boardId: board.id,
+    assignedBy: suggested.has(board.slug) ? ("KEYWORD_MATCH" as const) : ("USER" as const),
+  }));
+
+  try {
+    return await add(result, assignments, userId);
+  } catch (error) {
+    captureError({ error, source: "server" });
+    return {
+      status: "error",
+      message: "Couldn't add that paper to Graze. Try again in a moment.",
+    };
+  }
+}
+
+async function add(
+  result: LiveSearchResult,
+  fields: FieldAssignment[],
+  userId: string,
+): Promise<PromoteOutcome> {
   const outcome = await promoteCandidate(
     {
       title: result.title,
@@ -34,12 +61,18 @@ export async function promoteToGraze(
       publisher: result.publisher,
       journal: result.venue,
       year: result.year,
-      url: result.oaUrl ?? (result.doi ? `https://doi.org/${result.doi}` : ""),
+      // Prefer the free full text so the stored entry points somewhere readable.
+      url:
+        result.oaUrl ??
+        result.landingUrl ??
+        (result.doi ? `https://doi.org/${result.doi}` : ""),
       sourceName: "OpenAlex",
       citationCount: result.citationCount,
+      language: result.language,
+      workType: result.workType,
     },
-    board.id,
-    session.user.id,
+    fields,
+    userId,
     { allowPendingWhenNotAllowlisted: true },
   );
 

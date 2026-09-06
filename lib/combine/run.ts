@@ -4,13 +4,14 @@ import { searchCrossref } from "@/lib/combine/sources/crossref";
 import { searchOpenAlex } from "@/lib/combine/sources/openalex";
 import { searchSemanticScholar } from "@/lib/combine/sources/semanticScholar";
 import { searchPubMed } from "@/lib/combine/sources/pubmed";
-import { isJournalAllowlisted } from "@/lib/combine/allowlist";
+import { assessCandidate } from "@/lib/combine/reliability";
 import { truncate } from "@/lib/combine/utils";
 import { maybePromoteField } from "@/lib/actions/fields";
 import { suggestFieldsFromRun } from "@/lib/combine/suggestFields";
 import { resolvePreprintDuplicate } from "@/lib/combine/preprintMatch";
+import { rankFields, type MatchableField } from "@/lib/fieldMatch";
 import type { CombineCandidate } from "@/lib/combine/types";
-import type { PostStatus } from "@prisma/client";
+import type { FieldAssignmentSource, PostStatus, ReliabilityStatus } from "@prisma/client";
 
 const MAX_CANDIDATES_PER_SOURCE = 5;
 const MAX_INSERTS_PER_FIELD = 3;
@@ -46,7 +47,10 @@ export type PromoteOutcome =
   | { status: "duplicate"; existingPostId: string }
   | { status: "preprint-skipped"; existingPostId: string }
   | { status: "preprint-attached"; existingPostId: string }
-  | { status: "rejected"; reason: "no-abstract" | "not-allowlisted" };
+  | {
+      status: "rejected";
+      reason: "no-abstract" | "not-allowlisted" | "not-peer-reviewed" | "retracted";
+    };
 
 export async function runCombine(): Promise<CombineRunSummary> {
   const summary: CombineRunSummary = {
@@ -64,7 +68,11 @@ export async function runCombine(): Promise<CombineRunSummary> {
     tokensUsed: { inputTokens: 0, outputTokens: 0 },
   };
 
-  const allFields = await prisma.board.findMany({ where: { status: { not: "SUSPENDED" } } });
+  // Only Fields open to new content. Archived Fields are skipped alongside suspended ones
+  // — there's no point ingesting fresh papers into a Field that's been retired.
+  const allFields = await prisma.board.findMany({
+    where: { status: { in: ["ACTIVE", "PROVISIONAL"] } },
+  });
   const fields = allFields.slice(0, MAX_FIELDS_PER_RUN);
   summary.fieldsSkippedRunCap = allFields.length - fields.length;
   if (summary.fieldsSkippedRunCap > 0) {
@@ -72,6 +80,15 @@ export async function runCombine(): Promise<CombineRunSummary> {
       `[Combine] Run cap hit: processing ${fields.length}/${allFields.length} Fields this run, ${summary.fieldsSkippedRunCap} deferred to the next run.`,
     );
   }
+
+  // Held once per run: every candidate is matched against all of these, not just the Field
+  // whose search turned it up.
+  const assignableFields: MatchableField[] = allFields.map((f) => ({
+    id: f.id,
+    slug: f.slug,
+    name: f.name,
+    searchKeywordsJson: f.searchKeywordsJson,
+  }));
 
   const systemAuthor = await getOrCreateCombineAuthor();
   const allCandidatesThisRun: CombineCandidate[] = [];
@@ -111,7 +128,24 @@ export async function runCombine(): Promise<CombineRunSummary> {
       // The scheduled/batch pipeline is unattended, so a candidate that fails the
       // allowlist check is dropped outright — there's no human in the loop yet to
       // weigh in on it (that's what manual "Add to Graze" promotion is for).
-      const outcome = await promoteCandidate(candidate, field.id, systemAuthor.id, {
+      // The Field whose keywords surfaced this paper, plus any other Field the same
+      // matcher says it belongs in. A paper on AI in clinical triage shouldn't be visible
+      // only to whichever Field's search happened to find it first.
+      const alsoMatches = rankFields(
+        {
+          title: candidate.title,
+          abstract: candidate.abstract,
+          venue: candidate.journal,
+          topics: candidate.topics,
+        },
+        assignableFields.filter((f) => f.id !== field.id),
+      );
+      const assignments: FieldAssignment[] = [
+        { boardId: field.id, assignedBy: "COMBINE" as const },
+        ...alsoMatches.map((m) => ({ boardId: m.id, assignedBy: "KEYWORD_MATCH" as const })),
+      ];
+
+      const outcome = await promoteCandidate(candidate, assignments, systemAuthor.id, {
         allowPendingWhenNotAllowlisted: false,
       });
 
@@ -171,7 +205,7 @@ export async function runCombine(): Promise<CombineRunSummary> {
 // queued for admin review instead of a silent drop.
 export async function promoteCandidate(
   candidate: CombineCandidate,
-  boardId: string,
+  fields: FieldAssignment[],
   authorId: string,
   opts: { allowPendingWhenNotAllowlisted: boolean },
 ): Promise<PromoteOutcome> {
@@ -197,7 +231,7 @@ export async function promoteCandidate(
     // results lack one) doesn't get re-inserted, and critically doesn't trigger a second
     // Claude API call to regenerate an explainer it already has.
     const existing = await prisma.post.findFirst({
-      where: { type: "RESEARCH", title: candidate.title },
+      where: { title: candidate.title },
       select: { id: true },
     });
     if (existing) return { status: "duplicate", existingPostId: existing.id };
@@ -207,32 +241,41 @@ export async function promoteCandidate(
     return { status: "rejected", reason: "no-abstract" };
   }
 
-  const allowlisted = await isJournalAllowlisted({
-    issn: candidate.issn,
-    journal: candidate.journal,
+  // Peer-review status, the DOAJ allowlist, and Retraction Watch, applied as one stated
+  // policy (lib/combine/reliability.ts). Anything the checks disagree about lands in the
+  // review queue rather than being resolved here.
+  const decision = await assessCandidate(candidate, {
+    humanChose: opts.allowPendingWhenNotAllowlisted,
   });
-  if (!allowlisted && !opts.allowPendingWhenNotAllowlisted) {
-    return { status: "rejected", reason: "not-allowlisted" };
+
+  if (decision.outcome === "reject") {
+    return { status: "rejected", reason: decision.reason };
   }
 
-  const status: PostStatus = allowlisted ? "PUBLISHED" : "PENDING";
-  const { postId, tokensUsed } = await insertCandidate(candidate, boardId, authorId, status);
+  const status: PostStatus = decision.outcome === "publish" ? "PUBLISHED" : "PENDING";
+  const { postId, tokensUsed } = await insertCandidate(candidate, fields, authorId, status, {
+    reliability: decision.reliability,
+    reviewReason: decision.outcome === "review" ? decision.reviewReason : null,
+  });
   return status === "PUBLISHED"
     ? { status: "published", postId, tokensUsed }
     : { status: "pending", postId, tokensUsed };
 }
 
+// One Field assignment: which Field, and how the paper came to be filed under it.
+export type FieldAssignment = { boardId: string; assignedBy: FieldAssignmentSource };
+
 async function insertCandidate(
   candidate: CombineCandidate,
-  boardId: string,
+  fields: FieldAssignment[],
   authorId: string,
   status: PostStatus,
+  signal: { reliability: ReliabilityStatus; reviewReason: string | null },
 ): Promise<{ postId: string; tokensUsed: { inputTokens: number; outputTokens: number } }> {
   const abstract = truncate(candidate.abstract!, 2000);
 
   const post = await prisma.post.create({
     data: {
-      type: "RESEARCH",
       title: candidate.title,
       authors: candidate.authors,
       field: candidate.journal ?? undefined,
@@ -240,18 +283,42 @@ async function insertCandidate(
       abstract,
       externalUrl: candidate.url || null,
       citationCount: candidate.citationCount,
+      language: candidate.language ?? null,
       authorId,
-      boardId,
+      fields: {
+        create: fields.map((f) => ({ boardId: f.boardId, assignedBy: f.assignedBy })),
+      },
       source: "COMBINE",
       sourceName: candidate.sourceName,
       status,
       doi: candidate.doi,
+      issn: candidate.issn,
+      workType: candidate.workType ?? null,
+      reliability: signal.reliability,
+      reviewReason: signal.reviewReason,
     },
   });
 
-  // This is always a brand-new post at this point (the DOI/title dedup check above
-  // already ran), so there's no existing explainer to skip — but generate it against this
-  // specific new row, never speculatively ahead of insertion.
+  // Someone may already have hit "Chew on this" on this paper from live search, which
+  // stores a DOI-keyed explainer with no post attached. Adopt it rather than paying for
+  // an identical second generation.
+  if (candidate.doi) {
+    const orphaned = await prisma.researchExplainer.findUnique({
+      where: { doi: candidate.doi },
+      select: { id: true, postId: true },
+    });
+    if (orphaned && !orphaned.postId) {
+      await prisma.researchExplainer.update({
+        where: { id: orphaned.id },
+        data: { postId: post.id },
+      });
+      if (status === "PUBLISHED") {
+        for (const f of fields) await maybePromoteField(f.boardId);
+      }
+      return { postId: post.id, tokensUsed: { inputTokens: 0, outputTokens: 0 } };
+    }
+  }
+
   const { explainer, isDemo, usage } = await generateExplainer({
     title: candidate.title,
     authors: candidate.authors,
@@ -262,14 +329,19 @@ async function insertCandidate(
   await prisma.researchExplainer.create({
     data: {
       postId: post.id,
+      doi: candidate.doi,
+      tldr: explainer.tldr,
       summary: explainer.summary,
+      keyFindingsJson: JSON.stringify(explainer.keyFindings),
       termsJson: JSON.stringify(explainer.terms),
       quizJson: JSON.stringify(explainer.quiz),
       isDemo,
     },
   });
 
-  if (status === "PUBLISHED") await maybePromoteField(boardId);
+  if (status === "PUBLISHED") {
+    for (const f of fields) await maybePromoteField(f.boardId);
+  }
 
   return { postId: post.id, tokensUsed: usage };
 }

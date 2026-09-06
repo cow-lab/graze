@@ -3,6 +3,10 @@
 import { useState, useTransition } from "react";
 import { Sparkles } from "lucide-react";
 import { runCombineAction } from "@/lib/actions/admin";
+import InlineError from "@/components/InlineError";
+import LoadingMessage from "@/components/LoadingMessage";
+import { LOADING_MESSAGES } from "@/lib/loadingMessages";
+import Spinner from "@/components/Spinner";
 import type { CombineRunSummary } from "@/lib/combine/run";
 
 export default function RunCombineButton() {
@@ -12,13 +16,11 @@ export default function RunCombineButton() {
 
   function handleClick() {
     setError(null);
+    setSummary(null);
     startTransition(async () => {
-      try {
-        const result = await runCombineAction();
-        setSummary(result);
-      } catch {
-        setError("The Combine run failed — check the server logs.");
-      }
+      const result = await runCombineAction();
+      if (result.ok) setSummary(result.data);
+      else setError(result.message);
     });
   }
 
@@ -28,12 +30,15 @@ export default function RunCombineButton() {
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-teal text-ink text-sm font-medium hover:brightness-110 transition disabled:opacity-60"
+        className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-teal text-white text-sm font-medium hover:brightness-110 transition disabled:opacity-60"
       >
-        <Sparkles size={14} />
+        {isPending ? <Spinner /> : <Sparkles size={14} aria-hidden="true" />}
         {isPending ? "Running The Combine…" : "Run The Combine now"}
       </button>
-      {error && <p className="text-xs text-rose">{error}</p>}
+      {/* This one reaches five external APIs and a Claude call per Field, so it can run
+          for a while. Saying so beats a button that looks stuck. */}
+      {isPending && <LoadingMessage messages={LOADING_MESSAGES.combine} />}
+      <InlineError message={error} />
       {summary && !isPending && (
         <div className="text-xs text-fg-muted font-mono">
           <p>

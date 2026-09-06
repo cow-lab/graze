@@ -70,10 +70,26 @@ export async function registerAction(
   await signIn("credentials", { email, password, redirectTo: "/" });
 }
 
+// Every write action that uses session.user.id as a foreign key should go through this
+// rather than calling auth() directly. A JWT session stays "valid" (correctly signed)
+// even if the underlying user row is gone — e.g. the database got reset since this
+// browser last logged in — so without this check, the first vote/comment/post after that
+// crashes with a raw Prisma foreign-key error instead of just asking the user to log in
+// again.
 export async function requireUserId(): Promise<string> {
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/login");
   }
-  return session.user.id;
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true },
+  });
+  if (!user) {
+    await signOut({ redirectTo: "/login" });
+    redirect("/login"); // unreachable in practice — signOut always redirects — but keeps this function's return type honest
+  }
+
+  return user.id;
 }

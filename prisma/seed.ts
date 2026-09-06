@@ -51,41 +51,6 @@ async function main() {
 
   const byEmail = Object.fromEntries(users.map((u) => [u.email, u]));
 
-  // ---------- Affiliations (the real verification mechanism) ----------
-  // Verification now lives here, not on the account — each of these mirrors what used
-  // to be the seed user's flat `verified: true` flag, expressed as a proper affiliation.
-  await Promise.all(
-    [
-      { email: "dana@quantcredit.io", title: "Head of Risk", institution: "QuantCredit" },
-      { email: "evasquez@mit.edu", title: "Professor", institution: "MIT" },
-      { email: "wzhang@stanford.edu", title: "Research Scientist", institution: "Stanford University" },
-      { email: "sofia@healthbridge.co", title: "Product Lead", institution: "HealthBridge" },
-      { email: "piyer@berkeley.edu", title: "PhD Candidate", institution: "UC Berkeley" },
-      { email: "grace@aridsense.com", title: "Founder", institution: "AridSense" },
-      { email: "amara@jhu.edu", title: "Postdoctoral Researcher", institution: "Johns Hopkins University" },
-      { email: "lars@nordicwind.no", title: "Engineering Director", institution: "NordicWind" },
-    ].map((a) =>
-      prisma.affiliation.create({
-        data: {
-          userId: byEmail[a.email].id,
-          title: a.title,
-          institution: a.institution,
-          email: a.email,
-          verified: true,
-        },
-      }),
-    ),
-  );
-
-  // ---------- Contact links ----------
-  await prisma.user.update({
-    where: { email: "piyer@berkeley.edu" },
-    data: {
-      googleScholarUrl: "https://scholar.google.com/citations?user=piyer",
-      githubUrl: "https://github.com/piyer",
-    },
-  });
-
   const boards = await Promise.all(
     [
       {
@@ -103,7 +68,7 @@ async function main() {
       {
         slug: "Healthtech",
         name: "Healthtech",
-        description: "Real problems from clinics, health systems, and med-adjacent startups.",
+        description: "Clinical research, health systems, and med-adjacent applied work.",
         searchKeywords: ["digital health", "clinical machine learning", "healthcare access"],
       },
       {
@@ -160,20 +125,8 @@ async function main() {
   const byBoard = Object.fromEntries(boards.map((b) => [b.slug, b]));
 
   // ---------- FintechAI ----------
-  const fintechProblem = await prisma.post.create({
-    data: {
-      type: "POST",
-      title: "Detecting synthetic identity fraud in real-time onboarding",
-      description:
-        "We're a mid-size digital lender processing ~40k new account applications a month. Synthetic identities (real SSN fragments stitched to fabricated personal details) are slipping past our KYC stack and defaulting after building credit history for 6-12 months. We need an approach that scores applications for synthetic-identity risk at onboarding time, using only the data we already collect (device fingerprint, application metadata, bureau pulls) — no new data partnerships.",
-      authorId: byEmail["dana@quantcredit.io"].id,
-      boardId: byBoard["Fintech"].id,
-    },
-  });
-
   const fintechResearch = await prisma.post.create({
     data: {
-      type: "RESEARCH",
       title: "Graph Neural Networks for Synthetic Identity Detection",
       authors: "Priya Iyer, Daniel Osei",
       field: "Fintech AI",
@@ -182,7 +135,14 @@ async function main() {
         "Synthetic identities are built by combining fragments of real personal data with fabricated details, making them hard to catch with rules that check one applicant at a time. We build a graph where applications are connected if they share any piece of data (an address, a device, a phone number), and use a graph neural network to flag suspicious clusters of applications rather than judging each one alone. In tests on a large anonymized lending dataset, this approach caught significantly more synthetic identities than traditional scoring, without needing any new data sources.",
       externalUrl: "https://arxiv.org/abs/2501.04821",
       authorId: byEmail["piyer@berkeley.edu"].id,
-      boardId: byBoard["Fintech"].id,
+      fields: {
+        create: [
+          { boardId: byBoard["Fintech"].id, assignedBy: "USER" },
+          // Deliberately in two Fields: an AI method applied to lending sits in both, and
+          // a fresh instance should show that rather than implying one Field per paper.
+          { boardId: byBoard["Cybersecurity"].id, assignedBy: "KEYWORD_MATCH" },
+        ],
+      },
     },
   });
 
@@ -190,6 +150,13 @@ async function main() {
     data: {
       postId: fintechResearch.id,
       isDemo: true,
+      tldr:
+        "Fraud rings reuse data across fake applications, so linking applications into a graph catches rings that per-application checks miss.",
+      keyFindingsJson: JSON.stringify([
+        "Caught significantly more synthetic identities than per-application scoring on a large anonymised lending dataset.",
+        "Needs no new data sources — it runs on the application metadata lenders already collect.",
+        "Works by flagging suspicious clusters, so it only helps once a ring has filed several applications.",
+      ]),
       summary:
         "Synthetic identities are fake people stitched together from bits of real personal data, and they're hard to spot one application at a time. This paper connects applications that share any piece of data into a graph and uses a graph neural network to flag suspicious clusters instead of judging each applicant alone. Tested on real lending data, it caught far more synthetic identities than traditional scoring — using only data lenders already collect.",
       termsJson: JSON.stringify([
@@ -233,22 +200,9 @@ async function main() {
     },
   });
 
-  const fintechSolution = await prisma.post.create({
-    data: {
-      type: "POST",
-      title: "Open-source fraud-graph prototype (link-analysis dashboard)",
-      description:
-        "Built a small prototype that ingests application metadata, builds a shared-attribute graph like the one described in Iyer & Osei's paper, and surfaces suspicious clusters in a dashboard analysts can review. Repo includes a synthetic test dataset and a walkthrough notebook.",
-      refPostId: fintechResearch.id,
-      authorId: byEmail["tbecker@gmail.com"].id,
-      boardId: byBoard["Fintech"].id,
-    },
-  });
-
   // ---------- ClimateResearch ----------
   const climateResearch1 = await prisma.post.create({
     data: {
-      type: "RESEARCH",
       title: "Low-Cost Direct Air Capture Sorbents from Recycled Amine Waste",
       authors: "Elena Vasquez, Rahul Mehta, Chen Liu",
       field: "Climate Research",
@@ -257,7 +211,7 @@ async function main() {
         "Direct air capture (machines that pull CO2 straight out of the atmosphere) is expensive largely because the chemical sorbents that grab CO2 are costly to produce. This paper shows that amine waste streams from industrial gas-treatment plants — normally discarded — can be repurposed into an effective CO2-capturing sorbent at a fraction of the cost of purpose-made materials. Lab-scale testing found capture performance close to commercial sorbents at roughly one-third the material cost.",
       externalUrl: "https://arxiv.org/abs/2403.09912",
       authorId: byEmail["evasquez@mit.edu"].id,
-      boardId: byBoard["Climate"].id,
+      fields: { create: [{ boardId: byBoard["Climate"].id, assignedBy: "USER" }] },
     },
   });
 
@@ -265,6 +219,13 @@ async function main() {
     data: {
       postId: climateResearch1.id,
       isDemo: true,
+      tldr:
+        "Waste chemicals from gas-treatment plants can be reused as CO2-capture material at about a third of the usual cost.",
+      keyFindingsJson: JSON.stringify([
+        "Recycled amine waste captured CO2 at roughly a third of the cost of purpose-made sorbent.",
+        "Capture rate was close to commercial material over repeated use cycles.",
+        "Turns an industrial waste stream into feedstock, so the saving compounds with disposal costs avoided.",
+      ]),
       summary:
         "Machines that capture CO2 straight from the air are expensive mainly because the chemical material that grabs the CO2 costs a lot to make. This paper shows that waste chemicals thrown away by industrial gas-treatment plants can be reused to make that same kind of CO2-grabbing material, at about a third of the usual cost. In lab tests, the recycled material captured almost as much CO2 as the expensive commercial version.",
       termsJson: JSON.stringify([
@@ -318,7 +279,6 @@ async function main() {
 
   const climateResearch2 = await prisma.post.create({
     data: {
-      type: "RESEARCH",
       title: "Satellite-Based Early Warning for Coastal Flood Risk in Small Island States",
       authors: "Elena Vasquez, Amara Diallo",
       field: "Climate Research",
@@ -327,7 +287,7 @@ async function main() {
         "Small island nations often lack the dense sensor networks that richer coastal regions use to predict flooding. This paper combines publicly available satellite sea-level and rainfall data with a simple, low-compute forecasting model to give 48-hour flood warnings for coastal towns without any local hardware installation. Field validation in two Pacific island communities showed warning accuracy comparable to systems that cost 20x more to deploy.",
       externalUrl: "https://arxiv.org/abs/2309.11207",
       authorId: byEmail["evasquez@mit.edu"].id,
-      boardId: byBoard["Climate"].id,
+      fields: { create: [{ boardId: byBoard["Climate"].id, assignedBy: "USER" }] },
     },
   });
 
@@ -335,6 +295,13 @@ async function main() {
     data: {
       postId: climateResearch2.id,
       isDemo: true,
+      tldr:
+        "A flood-warning system built only from free satellite data matched local sensor networks in two Pacific island trials.",
+      keyFindingsJson: JSON.stringify([
+        "Predicted coastal flood risk using only publicly available satellite data — no local hardware to install or maintain.",
+        "Matched the warning accuracy of sensor-based systems in two Pacific island communities.",
+        "Runs on a lightweight model, so it doesn't need computing infrastructure the islands don't have.",
+      ]),
       summary:
         "Small island nations often can't afford the expensive sensor networks that predict coastal flooding elsewhere. This paper builds a flood-warning system using only free satellite data and a lightweight forecasting model, so no local hardware needs to be installed. Tested in two Pacific island communities, it gave accurate 48-hour flood warnings at a fraction of the cost of typical systems.",
       termsJson: JSON.stringify([
@@ -372,44 +339,9 @@ async function main() {
     },
   });
 
-  const climateProblem = await prisma.post.create({
-    data: {
-      type: "POST",
-      title: "Need for affordable soil-moisture sensors for smallholder farms",
-      description:
-        "We work with smallholder maize and cassava farmers across East Africa on drought resilience programs. Commercial soil-moisture sensors run $80-150 per unit, which is out of reach at the scale we need (thousands of farms). We need a sensor design or product that can be manufactured or assembled for under $10/unit while still giving usable irrigation-timing signal.",
-      authorId: byEmail["grace@aridsense.com"].id,
-      boardId: byBoard["Climate"].id,
-    },
-  });
-
-  await prisma.post.create({
-    data: {
-      type: "POST",
-      title: "Capacitive soil-moisture sensor prototype under $8/unit BOM",
-      description:
-        "Prototype using a simple capacitive sensing circuit (two copper strips + a 555 timer) read by an ESP32, batched over LoRa to a shared gateway. Bill of materials comes in under $8/unit at small-batch pricing. Field-tested on 3 test plots for two weeks against a commercial sensor with ~85% correlation on readings.",
-      refPostId: climateProblem.id,
-      authorId: byEmail["marcus.cole@outlook.com"].id,
-      boardId: byBoard["Climate"].id,
-    },
-  });
-
-  // ---------- HealthtechProblems ----------
-  const healthProblem = await prisma.post.create({
-    data: {
-      type: "POST",
-      title: "Predicting no-show appointments in low-resource clinics",
-      description:
-        "We run a network of community health clinics where no-show rates hover around 30%, wasting scarce provider time. We don't have the budget for a commercial predictive scheduling product. We need a lightweight approach to flag high-risk appointments (for a reminder call) using only data already in our basic EHR — no new patient surveys or data collection.",
-      authorId: byEmail["sofia@healthbridge.co"].id,
-      boardId: byBoard["Healthtech"].id,
-    },
-  });
-
+  // ---------- Healthtech ----------
   const healthResearch = await prisma.post.create({
     data: {
-      type: "RESEARCH",
       title: "Lightweight ML for No-Show Prediction in Community Clinics",
       authors: "Amara Obi, Jonah Kessler",
       field: "Healthtech",
@@ -418,7 +350,7 @@ async function main() {
         "Missed appointments waste provider time that's especially scarce in under-resourced clinics, but most no-show prediction tools require data these clinics don't collect. This paper shows that a simple model using only appointment history already sitting in basic electronic health records — like time since booking, past no-show count, and appointment type — can flag high-risk appointments about as well as far more complex commercial systems. The model is small enough to run on a clinic's existing scheduling computer with no cloud service required.",
       externalUrl: "https://arxiv.org/abs/2502.16650",
       authorId: byEmail["amara@jhu.edu"].id,
-      boardId: byBoard["Healthtech"].id,
+      fields: { create: [{ boardId: byBoard["Healthtech"].id, assignedBy: "USER" }] },
     },
   });
 
@@ -426,6 +358,13 @@ async function main() {
     data: {
       postId: healthResearch.id,
       isDemo: true,
+      tldr:
+        "Appointment history alone predicts no-shows about as well as commercial tools that need data poor clinics don't have.",
+      keyFindingsJson: JSON.stringify([
+        "Booking lead time and past no-show count carried most of the predictive power.",
+        "Performed comparably to far more complex commercial scheduling systems.",
+        "Small enough to run on a clinic's existing computer, with no cloud service required.",
+      ]),
       summary:
         "Missed clinic appointments waste scarce provider time, but most prediction tools need patient data that under-resourced clinics don't collect. This paper shows a simple model using only basic appointment history — like how far in advance it was booked and past no-shows — can flag risky appointments nearly as well as expensive commercial tools. It's small enough to run on a clinic's existing computer with no cloud service needed.",
       termsJson: JSON.stringify([
@@ -467,22 +406,9 @@ async function main() {
     },
   });
 
-  await prisma.post.create({
-    data: {
-      type: "POST",
-      title: "No-show risk flag added to open-source clinic scheduler",
-      description:
-        "Implemented the appointment-history features from Obi & Kessler's paper as a plugin for OpenClinicScheduler, surfacing a risk flag (low/med/high) next to each appointment so front-desk staff know who to call for reminders. Piloted at one clinic for a month.",
-      refPostId: healthResearch.id,
-      authorId: byEmail["raj.patel@gmail.com"].id,
-      boardId: byBoard["Healthtech"].id,
-    },
-  });
-
   // ---------- MaterialsScience ----------
   const materialsResearch = await prisma.post.create({
     data: {
-      type: "RESEARCH",
       title: "Self-Healing Polymer Coatings for Marine Infrastructure",
       authors: "Wei Zhang, Ines Fontaine",
       field: "Materials Science",
@@ -491,7 +417,7 @@ async function main() {
         "Protective coatings on offshore structures crack from wave impact and salt exposure, letting corrosion start underneath before anyone notices. This paper describes a polymer coating with microcapsules of healing agent embedded inside — when a crack forms, the capsules break open and seal the crack automatically, without needing an inspection or repair crew. In saltwater tank tests, coated steel samples resisted corrosion for over 5x longer than samples with standard coatings.",
       externalUrl: "https://arxiv.org/abs/2411.02233",
       authorId: byEmail["wzhang@stanford.edu"].id,
-      boardId: byBoard["Materials"].id,
+      fields: { create: [{ boardId: byBoard["Materials"].id, assignedBy: "USER" }] },
     },
   });
 
@@ -499,6 +425,13 @@ async function main() {
     data: {
       postId: materialsResearch.id,
       isDemo: true,
+      tldr:
+        "A coating with built-in healing capsules sealed its own cracks and resisted corrosion five times longer in saltwater tests.",
+      keyFindingsJson: JSON.stringify([
+        "Coated steel resisted corrosion over 5x longer than standard coatings in saltwater tank tests.",
+        "Cracks seal automatically when capsules rupture — no inspection or repair crew needed.",
+        "Tested in tank conditions, not yet on a real offshore structure over a full service life.",
+      ]),
       summary:
         "Coatings on offshore structures crack from waves and salt, letting corrosion sneak in underneath before anyone notices. This paper describes a coating with tiny healing capsules built in — when a crack forms, the capsules break open and seal it automatically, with no inspection or repair crew needed. In saltwater tests, coated steel resisted corrosion over 5 times longer than steel with standard coatings.",
       termsJson: JSON.stringify([
@@ -540,41 +473,13 @@ async function main() {
     },
   });
 
-  const materialsProblem = await prisma.post.create({
-    data: {
-      type: "POST",
-      title: "Corrosion-resistant coating needed for offshore wind turbine bases",
-      description:
-        "Our offshore wind turbine foundations are showing coating failure and early corrosion after 2-3 years, well short of the 20-year design life, in the splash zone (the section repeatedly exposed to waves and air). Standard marine coatings aren't holding up to that specific stress. We're open to any materials approach — coatings, cladding, or cathodic protection — that's been validated at even lab or pilot scale.",
-      authorId: byEmail["lars@nordicwind.no"].id,
-      boardId: byBoard["Materials"].id,
-    },
-  });
-
-  await prisma.post.create({
-    data: {
-      type: "POST",
-      title: "Splash-zone coating test rig + self-healing formulation writeup",
-      description:
-        "Built a small accelerated-weathering test rig (simulated wave splash + UV + salt spray) to benchmark coating candidates, including a variant of the self-healing microcapsule approach from Zhang & Fontaine's paper adapted for a steel substrate. Early results and rig design shared in the linked writeup.",
-      refPostId: materialsResearch.id,
-      authorId: byEmail["tbecker@gmail.com"].id,
-      boardId: byBoard["Materials"].id,
-    },
-  });
-
   // ---------- Votes ----------
   const allPosts = [
-    fintechProblem,
     fintechResearch,
-    fintechSolution,
     climateResearch1,
     climateResearch2,
-    climateProblem,
-    healthProblem,
     healthResearch,
     materialsResearch,
-    materialsProblem,
   ];
 
   const voters = users.filter((u) => u.email !== "tbecker@gmail.com");
@@ -599,19 +504,23 @@ async function main() {
   }
 
   // ---------- Comments ----------
+  // Comments are the only place people talk to each other now, and they attach to papers
+  // only. These are seeded to show what they're for: checking the machine-written summary,
+  // adding the nuance it flattened, and telling someone which part of the source is
+  // actually worth their time.
   const c1 = await prisma.comment.create({
     data: {
-      postId: fintechProblem.id,
+      postId: fintechResearch.id,
       authorId: byEmail["piyer@berkeley.edu"].id,
-      body: "This lines up with what we saw in our graph-based fraud detection work — shared attributes across applications are a strong signal. Happy to chat about adapting it to your data.",
+      body: "Author here. The summary above is fair but it undersells the caveat: the graph only helps once a ring has submitted several applications. On a single application it's no better than the baseline scorer. Section 5.2 is the honest version of the results.",
     },
   });
   await prisma.comment.create({
     data: {
-      postId: fintechProblem.id,
+      postId: fintechResearch.id,
       authorId: byEmail["dana@quantcredit.io"].id,
       parentId: c1.id,
-      body: "That would be great — we don't have any graph tooling in our stack today, so even a rough prototype pointed at our application logs would help.",
+      body: "That matches what we see in production. Worth adding for anyone skimming: the reported lift is against a rules-only baseline, not against a modern scorer — Table 3, not the abstract.",
     },
   });
   // Demonstrates anonymous posting: Marcus posts this one as "Cow #4271" rather than
@@ -622,10 +531,10 @@ async function main() {
   });
   await prisma.comment.create({
     data: {
-      postId: fintechProblem.id,
+      postId: fintechResearch.id,
       authorId: byEmail["marcus.cole@outlook.com"].id,
       isAnonymous: true,
-      body: "Have you looked at device fingerprint reuse specifically? In our experience that's often the strongest single signal before you even need a full graph model.",
+      body: "If you only read one part, make it the device-fingerprint ablation. It suggests most of the gain comes from one feature, which isn't the story the intro tells.",
     },
   });
 
@@ -633,7 +542,7 @@ async function main() {
     data: {
       postId: climateResearch1.id,
       authorId: byEmail["grace@aridsense.com"].id,
-      body: "Really promising for cost-constrained deployments. Do you have a sense of how the recycled sorbent's capture rate degrades over repeat use cycles compared to the commercial material?",
+      body: "Really promising for cost-constrained deployments. Do you have a sense of how the recycled sorbent's capture rate degrades over repeat use cycles compared to the commercial material? The summary doesn't mention cycling at all.",
     },
   });
   await prisma.comment.create({
@@ -641,17 +550,100 @@ async function main() {
       postId: climateResearch1.id,
       authorId: byEmail["evasquez@mit.edu"].id,
       parentId: c2.id,
-      body: "Good question — we saw about 8% degradation after 50 cycles vs 5% for the commercial sorbent in our lab tests. Working on a follow-up looking at longer cycle counts now.",
+      body: "Good question — we saw about 8% degradation after 50 cycles vs 5% for the commercial sorbent in our lab tests. It's in the supplementary material rather than the paper body, which is why no summary picks it up.",
     },
   });
 
   await prisma.comment.create({
     data: {
-      postId: healthProblem.id,
+      postId: healthResearch.id,
       authorId: byEmail["amara@jhu.edu"].id,
-      body: "We published a paper on almost exactly this a few months back using only EHR appointment history — linked it as a research post in this field if it's useful.",
+      body: "One thing to know before you cite this: the clinics in the sample all had at least two years of scheduling history. If yours doesn't, the headline accuracy won't transfer.",
     },
   });
+
+  // ---------- Engagement (what people actually did with a paper) ----------
+  // Drives the "read the source" marker on comments and their ranking weight, and gives a
+  // fresh instance something to show for the metric the product is judged on.
+  await Promise.all(
+    [
+      { email: "piyer@berkeley.edu", post: fintechResearch, kind: "SOURCE_CLICK" as const, afterExplainer: false },
+      { email: "dana@quantcredit.io", post: fintechResearch, kind: "SOURCE_CLICK" as const, afterExplainer: true },
+      { email: "evasquez@mit.edu", post: climateResearch1, kind: "SOURCE_CLICK" as const, afterExplainer: true },
+      { email: "grace@aridsense.com", post: climateResearch1, kind: "COMPREHENSION_PASS" as const, afterExplainer: false },
+      { email: "amara@jhu.edu", post: healthResearch, kind: "SOURCE_CLICK" as const, afterExplainer: true },
+    ].map((e) =>
+      prisma.paperEngagement.create({
+        data: {
+          userId: byEmail[e.email].id,
+          postId: e.post.id,
+          doi: e.post.doi,
+          kind: e.kind,
+          afterExplainer: e.afterExplainer,
+        },
+      }),
+    ),
+  );
+
+  // ---------- A worked board ----------
+  // Dana's board, so a fresh instance shows what the Board is for rather than an empty
+  // canvas: cards with real notes on them and two connections she drew herself.
+  const danaId = byEmail["dana@quantcredit.io"].id;
+  const [danaCard1, danaCard2, danaCard3] = await Promise.all([
+    prisma.canvasCard.create({
+      data: {
+        userId: danaId,
+        postId: fintechResearch.id,
+        note: "Closest thing to our onboarding problem. Caveat from the comments: lift is measured against a rules-only baseline.",
+        x: 40,
+        y: 40,
+      },
+    }),
+    prisma.canvasCard.create({
+      data: {
+        userId: danaId,
+        postId: healthResearch.id,
+        note: "Different domain, same shape of argument: simple features on data you already hold beat the expensive system. Worth stealing the framing.",
+        x: 340,
+        y: 40,
+      },
+    }),
+    prisma.canvasCard.create({
+      data: {
+        userId: danaId,
+        externalDoi: "10.1145/3292500.3330919",
+        externalTitle: "Graph-based Fraud Detection in Financial Networks: A Survey",
+        externalAuthors: "L. Akoglu, C. Faloutsos",
+        externalVenue: "KDD",
+        externalYear: 2019,
+        externalUrl: "https://doi.org/10.1145/3292500.3330919",
+        note: "Read the survey first — it says clustering approaches were already standard by 2019, which makes the 'novel' claim look thinner.",
+        x: 40,
+        y: 270,
+      },
+    }),
+  ]);
+
+  await Promise.all([
+    prisma.canvasLink.create({
+      data: {
+        userId: danaId,
+        ...(danaCard1.id < danaCard3.id
+          ? { fromCardId: danaCard1.id, toCardId: danaCard3.id }
+          : { fromCardId: danaCard3.id, toCardId: danaCard1.id }),
+        label: "contradicts",
+      },
+    }),
+    prisma.canvasLink.create({
+      data: {
+        userId: danaId,
+        ...(danaCard1.id < danaCard2.id
+          ? { fromCardId: danaCard1.id, toCardId: danaCard2.id }
+          : { fromCardId: danaCard2.id, toCardId: danaCard1.id }),
+        label: "same argument",
+      },
+    }),
+  ]);
 
   // ---------- Curated allowlist (DOAJ-style validity filter) ----------
   await Promise.all(
@@ -691,10 +683,19 @@ async function main() {
       board: "Robotics",
       journal: "Scientific Reports",
       year: 2025,
-      doi: "10.1038/s41598-025-99123-4",
+      // Real DOIs, so features that reach out to OpenAlex/Crossref by DOI — related papers
+      // and the retraction re-sync — actually have something to resolve in a fresh demo.
+      doi: "10.1038/s41598-019-56666-7",
       citationCount: 14,
       abstract:
         "Rigid robotic grippers struggle with the wide variety of irregular items in warehouse picking, often damaging fragile goods or dropping oddly-shaped ones. This paper presents a soft, modular gripper built from silicone fingers that conform to an object's shape on contact, assembled from cheap, swappable parts so a damaged finger can be replaced in minutes instead of the whole gripper. In trials picking 200 mixed warehouse items, the modular soft gripper matched the success rate of grippers costing 4x more.",
+      tldr:
+        "A soft modular gripper matched rigid grippers costing four times as much on 200 mixed warehouse items.",
+      keyFindingsJson: JSON.stringify([
+        "Matched the success rate of grippers costing 4x more across 200 mixed warehouse items.",
+        "Damaged fingers swap out in minutes instead of replacing the whole gripper.",
+        "Built from cheap silicone parts, which is what makes the per-unit cost low.",
+      ]),
       summary:
         "Rigid robot grippers often damage fragile items or drop oddly-shaped ones in warehouses. This paper builds a soft, modular gripper from cheap silicone fingers that conform to whatever they touch, with parts that swap out in minutes when damaged instead of replacing the whole gripper. In warehouse trials, it matched pricier rigid grippers' success rate at a fraction of the cost.",
       terms: [
@@ -730,7 +731,7 @@ async function main() {
       board: "Energy",
       journal: "PLOS ONE",
       year: 2024,
-      doi: "10.1371/journal.pone.0299887",
+      doi: "10.1371/journal.pone.0173664",
       citationCount: 3,
       // Demo data for the retraction re-sync feature — flagged here directly rather than
       // by actually calling Crossref during seeding, so the "Retracted" badge has
@@ -738,6 +739,13 @@ async function main() {
       retracted: true,
       abstract:
         "Batteries retired from electric vehicles still hold significant usable capacity, but predicting how quickly a specific used battery will keep degrading is hard, which makes homeowners and installers reluctant to rely on them for solar storage. This paper trains a forecasting model on real second-life battery usage data to predict remaining useful life within a home solar setup, letting installers set realistic capacity guarantees instead of avoiding second-life batteries altogether.",
+      tldr:
+        "A model trained on real usage data predicts how fast a used EV battery will degrade, making second-life storage sellable.",
+      keyFindingsJson: JSON.stringify([
+        "Forecasts a specific used battery's remaining capacity curve from its real usage history.",
+        "Lets installers offer capacity guarantees instead of avoiding second-life batteries entirely.",
+        "Trained on real-world usage data rather than lab cycling, which is why it transfers to fielded packs.",
+      ]),
       summary:
         "Batteries retired from electric cars still have plenty of life left, but nobody could reliably predict how fast a specific used battery would keep degrading — so installers avoided using them for home solar storage. This paper builds a forecasting model trained on real usage data that predicts a used battery's remaining useful life, letting installers offer realistic guarantees instead of steering clear of second-life batteries.",
       terms: [
@@ -772,18 +780,20 @@ async function main() {
   for (const q of queueSeed as (typeof queueSeed[number] & { citationCount?: number; retracted?: boolean })[]) {
     const post = await prisma.post.create({
       data: {
-        type: "RESEARCH",
-        title: q.title,
+          title: q.title,
         authors: q.authors,
         field: q.journal,
         year: q.year,
         abstract: q.abstract,
         externalUrl: `https://doi.org/${q.doi}`,
         authorId: combineAuthor.id,
-        boardId: byBoard[q.board].id,
+        fields: { create: [{ boardId: byBoard[q.board].id, assignedBy: "COMBINE" }] },
         source: "COMBINE",
         sourceName: q.journal === "Scientific Reports" ? "OpenAlex" : "Crossref",
         status: "PUBLISHED",
+        // Everything The Combine publishes on its own has cleared the same three checks.
+        workType: "journal-article",
+        reliability: "PEER_REVIEWED_LISTED",
         doi: q.doi,
         citationCount: q.citationCount ?? null,
         retractedAt: q.retracted ? new Date() : null,
@@ -794,6 +804,8 @@ async function main() {
       data: {
         postId: post.id,
         isDemo: true,
+        tldr: q.tldr,
+        keyFindingsJson: q.keyFindingsJson,
         summary: q.summary,
         termsJson: JSON.stringify(q.terms),
         quizJson: JSON.stringify(q.quiz),
@@ -801,11 +813,59 @@ async function main() {
     });
   }
 
+  // ---------- The two reliability states you can't get to by passing every check ----------
+  // Seeded so a fresh instance shows what the composite signal looks like when it isn't a
+  // clean pass: a preprint an admin let through anyway, and a paper where two sources
+  // disagree and nothing auto-resolved it.
+  await prisma.post.create({
+    data: {
+      title: "Scaling Laws for Sparse Mixture-of-Experts Retrieval Models",
+      authors: "R. Ostrowski, M. Haddad",
+      field: "arXiv",
+      year: 2026,
+      abstract:
+        "We study how retrieval-augmented mixture-of-experts models scale with expert count and index size, and report a regime where adding experts stops improving recall. Results are from a single lab's reproduction of three public benchmarks; the work has been posted as a preprint and has not been through peer review.",
+      externalUrl: "https://arxiv.org/abs/2601.09912",
+      doi: "10.48550/arxiv.2601.09912",
+      authorId: combineAuthor.id,
+      fields: { create: [{ boardId: byBoard["Cybersecurity"].id, assignedBy: "COMBINE" }] },
+      source: "COMBINE",
+      sourceName: "OpenAlex",
+      status: "PUBLISHED",
+      workType: "posted-content",
+      reliability: "PREPRINT",
+      citationCount: 4,
+    },
+  });
+
+  await prisma.post.create({
+    data: {
+      title: "Rapid Multi-Omic Screening for Early-Stage Biomarker Discovery",
+      authors: "L. Vance, D. Okereke, S. Mahmood",
+      field: "Journal of Translational Omics",
+      year: 2025,
+      abstract:
+        "A high-throughput screening protocol for candidate biomarkers across four omic layers, validated on a retrospective cohort of 1,200 samples. The authors report a 40% reduction in screening time against the standard protocol.",
+      externalUrl: "https://doi.org/10.9999/jto.2025.114",
+      doi: "10.9999/jto.2025.114",
+      authorId: combineAuthor.id,
+      fields: { create: [{ boardId: byBoard["Healthtech"].id, assignedBy: "COMBINE" }] },
+      source: "COMBINE",
+      sourceName: "Crossref",
+      status: "PENDING",
+      workType: "journal-article",
+      reliability: "FLAGGED",
+      reviewReason:
+        "Sources disagree: DOAJ lists this journal, but Retraction Watch shows 11 retractions across 640 works (1.72%) — an outlier. Needs a human call.",
+      citationCount: 2,
+    },
+  });
+
   // ---------- Provisional Fields (demo data for the new spam-prevention flow) ----------
   // One freshly user-created Field still building traction, one Combine-suggested Field,
   // and one reported Field — so the sidebar's "New fields" section and /admin/fields both
   // have something to show on first run instead of being empty.
-  const spaceTech = await prisma.board.create({
+  await prisma.board.create({
     data: {
       slug: "SpaceTech",
       name: "SpaceTech",
@@ -815,17 +875,6 @@ async function main() {
       createdById: byEmail["tbecker@gmail.com"].id,
     },
   });
-  await prisma.post.create({
-    data: {
-      type: "POST",
-      title: "Cheap ground-station antenna design for university CubeSats",
-      description:
-        "Most off-the-shelf ground station antennas for tracking student CubeSats run well over $10k, which is out of reach for a lot of university programs. Looking for a lower-cost design that still holds a reliable link during a pass.",
-      authorId: byEmail["tbecker@gmail.com"].id,
-      boardId: spaceTech.id,
-    },
-  });
-
   await prisma.board.create({
     data: {
       slug: "QuantumComputing",
@@ -857,7 +906,7 @@ async function main() {
   });
 
   console.log(
-    `Seeded ${users.length + 2} users, ${boards.length + 3} boards (3 provisional), ${allPosts.length} posts.`,
+    `Seeded ${users.length + 2} users, ${boards.length + 3} fields (3 provisional), ${allPosts.length} papers, and a worked board for dana@quantcredit.io.`,
   );
   console.log(`Demo login password for every seed user: ${DEMO_PASSWORD}`);
   console.log(

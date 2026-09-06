@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/combine",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}

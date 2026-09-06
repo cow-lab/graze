@@ -29,9 +29,33 @@ export async function mergePosts(keepPostId: string, mergePostId: string): Promi
       }
     }
 
-    // Any community post responding to the one being merged away should keep pointing at
-    // a post that still exists.
-    await tx.post.updateMany({ where: { refPostId: mergePostId }, data: { refPostId: keepPostId } });
+    // Board cards carry the same (userId, postId) uniqueness as votes: if someone had
+    // both duplicates on their board, they keep one card — the one on the survivor —
+    // rather than ending up with two cards for one paper. The note on the card being
+    // dropped is folded into the survivor's when the survivor has none.
+    const mergeCards = await tx.canvasCard.findMany({ where: { postId: mergePostId } });
+    for (const card of mergeCards) {
+      const existing = await tx.canvasCard.findFirst({
+        where: { userId: card.userId, postId: keepPostId },
+      });
+      if (existing) {
+        if (!existing.note.trim() && card.note.trim()) {
+          await tx.canvasCard.update({ where: { id: existing.id }, data: { note: card.note } });
+        }
+        // Connections drawn to the dropped card would otherwise vanish with it.
+        await tx.canvasLink.updateMany({
+          where: { fromCardId: card.id },
+          data: { fromCardId: existing.id },
+        });
+        await tx.canvasLink.updateMany({
+          where: { toCardId: card.id },
+          data: { toCardId: existing.id },
+        });
+        await tx.canvasCard.delete({ where: { id: card.id } });
+      } else {
+        await tx.canvasCard.update({ where: { id: card.id }, data: { postId: keepPostId } });
+      }
+    }
 
     // If only one side has a "Chew on this" explainer, keep it rather than losing it —
     // ResearchExplainer.postId is unique, so only move it over when the survivor has none.

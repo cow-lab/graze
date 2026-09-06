@@ -1,18 +1,25 @@
 @import "tailwindcss";
 
+/* Text colours are tuned to clear WCAG AA (4.5:1) against every light surface they're
+   used on — panel (#fff), panel-2 (#ece4cc) and cream (#f6ecc9) — since most of the UI's
+   secondary text is small (11-13px) and so doesn't qualify for the 3:1 large-text
+   allowance. The previous warm grey (#8a8064) only reached 3.92:1 on white and 3.09:1 on
+   panel-2, and the moss/rose accents failed on tinted surfaces; each has been deepened
+   just enough to pass while keeping the same hue. The illustration keeps the original
+   brand greens (hard-coded in GrazeBackground) — those are decorative, not text. */
 :root {
   --color-cream: #f6ecc9;
   --color-panel: #ffffff;
   --color-panel-2: #ece4cc;
   --color-border: #ece4cc;
   --color-border-strong: #d8cbaa;
-  --color-moss: #5e7a3b;
-  --color-teal: #2f8478;
-  --color-rose: #c24f3d;
+  --color-moss: #556e35; /* 5.73:1 on panel, 4.51:1 on panel-2, 4.84:1 on cream */
+  --color-teal: #2f8377; /* 4.53:1 on panel */
+  --color-rose: #ab4636; /* 5.74:1 on panel, 4.52:1 on panel-2 */
   --color-sun: #f4c84e;
   --color-ink: #2b2a1f;
   --color-fg: #2b2a1f;
-  --color-fg-muted: #8a8064;
+  --color-fg-muted: #6d654f; /* 5.79:1 on panel, 4.56:1 on panel-2, 4.90:1 on cream */
 }
 
 @theme inline {
@@ -35,6 +42,17 @@
   --font-hand: var(--font-caveat);
 }
 
+/* The Discover hero bleeds to 100vw out of the centred column, which can exceed the
+   available width by the scrollbar's thickness on platforms whose scrollbars take layout
+   space. Clipping at the root keeps that from becoming a horizontal scrollbar.
+   Deliberately on <html>, not on a wrapper div: `overflow-x: clip` forces the other axis
+   to compute as `auto`, and on a div that makes a new scroll container — which silently
+   breaks the sticky header, since it then sticks to the div rather than the viewport. On
+   the root element the scroll container is the viewport either way. */
+html {
+  overflow-x: clip;
+}
+
 body {
   background: var(--color-cream);
   color: var(--color-fg);
@@ -48,4 +66,65 @@ body {
 
 * {
   scrollbar-color: var(--color-border-strong) var(--color-cream);
+}
+
+/* ---------------------------------------------------------------------------
+   Running-cow loading animation (components/RunningCowLoader.tsx)
+
+   Three cheap CSS animations rather than a frame-by-frame sprite: the legs flip
+   between a few discrete poses, the body bobs a pixel, and the whole cow slides
+   across a strip of hill. `steps()` on the legs is deliberate — a smooth rotation
+   reads as a machine part sweeping; discrete poses read as a drawing.
+
+   All of it is gated behind prefers-reduced-motion: no-preference. Under reduce,
+   the cow is simply standing there and the loading text still says what's
+   happening, which is the part that actually carries the information.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  .cow-leg {
+    transform-box: fill-box;
+    transform-origin: top center;
+    animation: cow-step 0.42s steps(3, end) infinite alternate;
+  }
+  .cow-leg-b {
+    animation-direction: alternate-reverse;
+  }
+  .cow-body {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: cow-bob 0.42s steps(2, end) infinite alternate;
+  }
+  .cow-run {
+    animation: cow-run 3.4s linear infinite;
+  }
+}
+
+@keyframes cow-step {
+  from {
+    transform: rotate(-17deg);
+  }
+  to {
+    transform: rotate(17deg);
+  }
+}
+
+@keyframes cow-bob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-1.5px);
+  }
+}
+
+/* Percentages resolve against the SVG viewBox here, not the cow's own box. The range is
+   just wide enough to carry the cow off both edges — any wider and the strip sits empty
+   for a noticeable beat each lap. */
+@keyframes cow-run {
+  from {
+    transform: translateX(-18%);
+  }
+  to {
+    transform: translateX(96%);
+  }
 }

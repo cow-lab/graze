@@ -2,19 +2,16 @@ import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import PostCard from "@/components/PostCard";
-import VerifiedBadge from "@/components/VerifiedBadge";
 import CowAvatar from "@/components/CowAvatar";
-import AffiliationsList from "@/components/AffiliationsList";
-import AddAffiliationForm from "@/components/AddAffiliationForm";
-import ContactLinks from "@/components/ContactLinks";
-import ContactLinksForm from "@/components/ContactLinksForm";
-import type { PostListItem } from "@/lib/posts";
+import SectionHeading from "@/components/SectionHeading";
+import EmptyState from "@/components/EmptyState";
+import { type PostListItem } from "@/lib/posts";
+import { getBoardedPostIds } from "@/lib/board";
 
 const authorSelect = {
   id: true,
   name: true,
   cowNumber: true,
-  _count: { select: { affiliations: { where: { verified: true } } } },
 } as const;
 
 export default async function ProfilePage({
@@ -29,16 +26,18 @@ export default async function ProfilePage({
   const user = await prisma.user.findUnique({
     where: { id },
     include: {
-      affiliations: { orderBy: { createdAt: "asc" } },
       // All PUBLISHED posts (for reputation/upvote math — a private number, safe to
       // include anonymous ones since nothing here is displayed per-post).
       posts: {
         where: { status: "PUBLISHED" },
         include: {
           author: { select: authorSelect },
-          board: { select: { slug: true, name: true } },
+          fields: {
+            select: { board: { select: { slug: true, name: true } } },
+            orderBy: { board: { name: "asc" } },
+          },
           votes: { select: { value: true, userId: true } },
-          _count: { select: { comments: true, referencingPosts: true } },
+          _count: { select: { comments: true } },
         },
         orderBy: { createdAt: "desc" },
       },
@@ -74,16 +73,13 @@ export default async function ProfilePage({
     user.posts.reduce((acc, p) => acc + p.votes.filter((v) => v.value === "UP").length, 0) +
     user.comments.reduce((acc, c) => acc + c.votes.filter((v) => v.value === "UP").length, 0);
 
-  const hasVerifiedAffiliation = user.affiliations.some((a) => a.verified);
-  const hasContactLinks =
-    user.websiteUrl || user.linkedinUrl || user.googleScholarUrl || user.githubUrl;
+  const boardedIds = await getBoardedPostIds(session?.user?.id, postsWithScore.map((p) => p.id));
 
   return (
     <div className="max-w-3xl mx-auto">
       <div className="bg-panel/95 border border-border-strong rounded-lg p-5 mb-6 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
           <h1 className="font-heading text-2xl font-semibold">{user.name}</h1>
-          {hasVerifiedAffiliation && <VerifiedBadge />}
         </div>
         <div className="flex items-center gap-6 mt-3 font-mono text-xs text-fg-muted">
           <span>
@@ -93,67 +89,44 @@ export default async function ProfilePage({
             <span className="text-fg text-sm font-medium">{upvotesReceived}</span> upvotes received
           </span>
           <span>
-            <span className="text-fg text-sm font-medium">{publicPosts.length}</span> posts
+            <span className="text-fg text-sm font-medium">{publicPosts.length}</span>{" "}
+            {publicPosts.length === 1 ? "paper" : "papers"}
           </span>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-border">
-          <h2 className="font-mono text-[11px] uppercase tracking-wide text-fg-muted mb-2">
-            Affiliations
-          </h2>
-          <AffiliationsList affiliations={user.affiliations} canEdit={isOwnProfile} />
-          {isOwnProfile && <AddAffiliationForm />}
-        </div>
-
-        {(hasContactLinks || isOwnProfile) && (
-          <div className="mt-4 pt-4 border-t border-border">
-            <h2 className="font-mono text-[11px] uppercase tracking-wide text-fg-muted mb-2">
-              Links
-            </h2>
-            {hasContactLinks && (
-              <ContactLinks
-                links={{
-                  websiteUrl: user.websiteUrl,
-                  linkedinUrl: user.linkedinUrl,
-                  googleScholarUrl: user.googleScholarUrl,
-                  githubUrl: user.githubUrl,
-                }}
-              />
-            )}
-            {isOwnProfile && (
-              <ContactLinksForm
-                defaults={{
-                  websiteUrl: user.websiteUrl,
-                  linkedinUrl: user.linkedinUrl,
-                  googleScholarUrl: user.googleScholarUrl,
-                  githubUrl: user.githubUrl,
-                }}
-              />
-            )}
-          </div>
-        )}
       </div>
 
-      <h2 className="font-heading text-base font-semibold mb-3">Posts</h2>
+      <SectionHeading title="Papers" />
       {postsWithScore.length === 0 ? (
-        <p className="text-sm text-fg-muted">No posts yet.</p>
+        <EmptyState>No papers submitted yet.</EmptyState>
       ) : (
         <div className="flex flex-col gap-2">
           {postsWithScore.map((post) => (
-            <PostCard key={post.id} post={post} isLoggedIn={!!session?.user} />
+            <PostCard
+              key={post.id}
+              post={post}
+              isLoggedIn={!!session?.user}
+              isOnBoard={boardedIds.has(post.id)}
+            />
           ))}
         </div>
       )}
 
       {isOwnProfile && anonymousPosts.length > 0 && (
         <div className="mt-8">
-          <h2 className="font-heading text-base font-semibold mb-1 flex items-center gap-2">
-            <CowAvatar size={16} /> Your anonymous posts
-          </h2>
-          <p className="text-xs text-fg-muted mb-3">
-            Only visible to you here — these show publicly as &ldquo;Cow #{user.cowNumber}&rdquo;,
-            never linked to this profile.
-          </p>
+          <SectionHeading
+            title={
+              <>
+                <CowAvatar size={16} /> Your anonymous papers
+              </>
+            }
+            description={
+              <>
+                Only visible to you here — these show publicly as &ldquo;Cow #{user.cowNumber}
+                &rdquo;, never linked to this profile.
+              </>
+            }
+          />
           <div className="flex flex-col gap-2">
             {anonymousPosts.map((p) => (
               <a

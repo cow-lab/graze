@@ -42,3 +42,34 @@ export async function withApiCache<T>(
 
   return results;
 }
+
+// Same read-through cache, for a single JSON value keyed by an arbitrary string rather
+// than a keyword search — the retraction/journal-profile lookups reuse the table without
+// pretending to be searches. A longer TTL: a journal's retraction history moves on the
+// scale of months, not hours.
+const FACT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export async function withCachedFact<T>(
+  source: string,
+  queryKey: string,
+  fetcher: () => Promise<T>,
+): Promise<T> {
+  const cached = await prisma.apiResponseCache.findUnique({
+    where: { source_queryKey: { source, queryKey } },
+  });
+  if (cached && Date.now() - cached.fetchedAt.getTime() < FACT_CACHE_TTL_MS) {
+    try {
+      return JSON.parse(cached.responseJson) as T;
+    } catch {
+      // Fall through to a live fetch if the cached JSON is somehow malformed.
+    }
+  }
+
+  const value = await fetcher();
+  await prisma.apiResponseCache.upsert({
+    where: { source_queryKey: { source, queryKey } },
+    update: { responseJson: JSON.stringify(value), fetchedAt: new Date() },
+    create: { source, queryKey, responseJson: JSON.stringify(value) },
+  });
+  return value;
+}
