@@ -57,6 +57,10 @@ export default function ReportFieldForm({ fields }: { fields: ReportableField[] 
           placeholder="What's wrong with it?"
           className="bg-panel-2 border border-border rounded-md px-2 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:outline-none focus:ring-1 focus:ring-moss resize-none"
         />
+        <p className="text-[11px] leading-relaxed text-fg-muted">
+          Reports go to Graze&apos;s administrators, not to other readers, and are stored
+          against your account.
+        </p>
         {error && <p className="text-[11px] text-rose">{error}</p>}
         <button
           type="submit"

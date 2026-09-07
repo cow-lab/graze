@@ -170,6 +170,26 @@ export default function SubmitForm({ boards }: { boards: { slug: string; name: s
         Post anonymously — shows as &ldquo;Cow #XXXX&rdquo; instead of your name
       </label>
 
+      {/* Two distinct things are being acknowledged: that the submitter has the right to
+          share what they're posting (copyright — uploads especially, since PDFs are stored
+          with public access), and that they understand this becomes public. Unchecked by
+          default and required; lib/actions/posts.ts rejects a submission without it. */}
+      <label className="flex items-start gap-2.5 rounded-md border border-border-strong bg-panel-2 px-3 py-2.5 text-[13px] leading-relaxed text-fg">
+        <input
+          type="checkbox"
+          name="rightsAcknowledged"
+          value="yes"
+          required
+          className="mt-0.5 size-4 shrink-0 accent-moss"
+        />
+        <span>
+          I have the right to share this paper or file, and I understand that what I submit —
+          including any uploaded PDF — becomes{" "}
+          <strong className="font-semibold">publicly visible to anyone</strong>, whether or
+          not they have a Graze account.
+        </span>
+      </label>
+
       {error && <p className="text-sm text-rose">{error}</p>}
 
       <div>

@@ -51,7 +51,7 @@ export default function DiscoverHero({
                 <Link href={`/?board=${field.slug}`} className="hover:text-moss hover:underline">
                   F~{field.slug}
                 </Link>
-                {i < fields.length - 1 && <span className="mx-1 text-fg-muted/60">·</span>}
+                {i < fields.length - 1 && <span aria-hidden="true" className="mx-1 text-fg-muted">·</span>}
               </span>
             ))}
           </p>

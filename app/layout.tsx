@@ -3,7 +3,7 @@ import { Fraunces, Inter, IBM_Plex_Mono, Caveat } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import GrazeBackground from "@/components/GrazeBackground";
-import LowBandwidthToggle from "@/components/LowBandwidthToggle";
+import Footer from "@/components/Footer";
 import LowBandwidthSuggestion from "@/components/LowBandwidthSuggestion";
 import { getCurrentUser } from "@/lib/session";
 import { isLowBandwidth } from "@/lib/lowBandwidth";
@@ -113,9 +113,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               <LowBandwidthSuggestion enabled={lowBandwidth} />
               {children}
             </main>
-            <footer className="w-full max-w-6xl mx-auto px-4 py-4 flex justify-end">
-              <LowBandwidthToggle enabled={lowBandwidth} />
-            </footer>
+            <Footer lowBandwidth={lowBandwidth} />
           </div>
         </div>
       </body>

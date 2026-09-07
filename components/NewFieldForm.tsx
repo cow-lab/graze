@@ -62,6 +62,10 @@ export default function NewFieldForm() {
         </p>
       </div>
 
+      <p className="text-xs leading-relaxed text-fg-muted">
+        Fields are public, and this one will be listed under your account as its creator.
+      </p>
+
       {error && <p className="text-sm text-rose">{error}</p>}
 
       <div>

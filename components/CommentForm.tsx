@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { createComment } from "@/lib/actions/comments";
 import { buttonClass } from "@/lib/controls";
+import Link from "next/link";
 
 export default function CommentForm({
   postId,
@@ -47,6 +48,14 @@ export default function CommentForm({
         <input type="checkbox" name="anonymous" className="accent-moss" />
         Post anonymously
       </label>
+      <p className="text-xs leading-relaxed text-fg-muted">
+        Comments are public. Posting anonymously hides your name from other readers but is
+        still linked to your account in the database —{" "}
+        <Link href="/privacy" className="text-moss underline underline-offset-2">
+          see the privacy policy
+        </Link>
+        .
+      </p>
       {error && <p className="text-xs text-rose">{error}</p>}
       <div>
         <button

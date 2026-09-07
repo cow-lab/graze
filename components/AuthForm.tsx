@@ -19,6 +19,7 @@ export default function AuthForm({
   submitLabel,
   altHref,
   altLabel,
+  requireConsent = false,
 }: {
   title: string;
   subtitle?: string;
@@ -27,6 +28,13 @@ export default function AuthForm({
   submitLabel: string;
   altHref: string;
   altLabel: string;
+  /**
+   * Show the "I agree to the Terms and Privacy Policy" checkbox and require it before the
+   * form can be submitted. Sign-up only — asking a returning user to re-consent on every
+   * login would be meaningless, and consent has to be a positive act at the point the
+   * account is created.
+   */
+  requireConsent?: boolean;
 }) {
   const [error, formAction, pending] = useActionState(action, undefined);
 
@@ -53,6 +61,33 @@ export default function AuthForm({
               />
             </div>
           ))}
+
+          {requireConsent && (
+            // Unchecked by default and `required`, so the browser blocks submission until
+            // it is ticked. GDPR consent has to be a freely given, unambiguous, affirmative
+            // act — a pre-ticked box is explicitly not consent. The server action checks
+            // this too, since a client-side `required` is trivially bypassed.
+            <label className="flex items-start gap-2.5 rounded-md border border-border-strong bg-panel-2 px-3 py-2.5 text-[13px] leading-relaxed text-fg">
+              <input
+                type="checkbox"
+                name="consent"
+                value="yes"
+                required
+                className="mt-0.5 size-4 shrink-0 accent-moss"
+              />
+              <span>
+                I agree to the{" "}
+                <Link href="/terms" className="text-moss underline underline-offset-2">
+                  Terms &amp; Conditions
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy" className="text-moss underline underline-offset-2">
+                  Privacy Policy
+                </Link>
+                , and I am at least 16 years old.
+              </span>
+            </label>
+          )}
 
           {error && <p className="text-sm text-rose">{error}</p>}
 

@@ -47,6 +47,12 @@ export async function registerAction(
   if (!name || !email || !password) {
     return "All fields are required.";
   }
+  // Checked here as well as in the browser: the checkbox is `required` in the markup, but
+  // that is a client-side courtesy, and an account must not be creatable without a record
+  // of the person having agreed.
+  if (formData.get("consent") !== "yes") {
+    return "Please agree to the Terms & Conditions and Privacy Policy to create an account.";
+  }
   if (password.length < 8) {
     return "Password must be at least 8 characters.";
   }

@@ -10,6 +10,7 @@ export default function RegisterPage() {
       submitLabel="Create account"
       altHref="/login"
       altLabel="Already have an account? Log in"
+      requireConsent
       fields={[
         { name: "name", label: "Name", type: "text", autoComplete: "name" },
         { name: "email", label: "Email", type: "email", autoComplete: "email" },

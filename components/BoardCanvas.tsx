@@ -125,7 +125,8 @@ export default function BoardCanvas({
     setStatus("Now say what the connection is.");
   }
 
-  // Click path, kept alongside the drag: it's the one that works from the keyboard.
+  // Click path, kept alongside the drag. This is what the keyboard-reachable "Connect"
+  // button on each card calls — see CardView. Press it on one card, then on a second.
   function handleConnectClick(cardId: string) {
     if (connectFrom === null) {
       setConnectFrom(cardId);
@@ -366,6 +367,7 @@ export default function BoardCanvas({
                 isConnectSource={connectFrom === card.id || linking?.fromId === card.id}
                 isLinkTarget={linkTarget === card.id}
                 isLinking={linking !== null}
+                onConnectClick={() => handleConnectClick(card.id)}
                 onAnchorDown={(e) => handleAnchorDown(card.id, e)}
                 onAnchorMove={handleAnchorMove}
                 onAnchorUp={handleAnchorUp}
@@ -492,7 +494,7 @@ function EmptyCanvasHint() {
 // yet. Gone for good once one connection exists.
 function ConnectHint() {
   return (
-    <p className="absolute left-1/2 bottom-6 -translate-x-1/2 text-center font-mono text-[11px] uppercase tracking-wide text-fg-muted/60 pointer-events-none">
+    <p className="absolute left-1/2 bottom-6 -translate-x-1/2 text-center font-mono text-[11px] uppercase tracking-wide text-fg-muted pointer-events-none">
       Drag from the dot on a card&apos;s edge to another card to connect them
     </p>
   );
@@ -505,6 +507,7 @@ function CardView({
   isConnectSource,
   isLinkTarget,
   isLinking,
+  onConnectClick,
   onAnchorDown,
   onAnchorMove,
   onAnchorUp,
@@ -520,6 +523,8 @@ function CardView({
   isConnectSource: boolean;
   isLinkTarget: boolean;
   isLinking: boolean;
+  /** Starts/completes the two-step connect flow. The keyboard route to linking cards. */
+  onConnectClick: () => void;
   onAnchorDown: (e: React.PointerEvent) => void;
   onAnchorMove: (e: React.PointerEvent) => void;
   onAnchorUp: (e: React.PointerEvent) => void;
@@ -637,6 +642,30 @@ function CardView({
         <GripVertical size={14} aria-hidden="true" />
         <span className="font-mono text-[10px] uppercase tracking-wide">Drag</span>
       </div>
+
+      {/* The keyboard route to connecting cards. The four edge anchors above are pointer-only
+          (aria-hidden, tabIndex -1), so without this button drawing a connection — the whole
+          point of the board — was unreachable without a mouse: a WCAG 2.1.1 failure on a
+          core feature. This drives the same two-step flow the anchors fall back to, and the
+          canvas's aria-live region announces each step. */}
+      <button
+        type="button"
+        onClick={onConnectClick}
+        aria-pressed={isConnectSource}
+        className={`absolute right-1 top-1 z-20 inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-moss ${
+          isConnectSource
+            ? "bg-moss text-white"
+            : "text-fg-muted hover:bg-moss/10 hover:text-moss"
+        }`}
+      >
+        <Waypoints size={12} aria-hidden="true" />
+        {isConnectSource ? "Connecting" : "Connect"}
+        <span className="sr-only">
+          {isConnectSource
+            ? ` — ${card.title} is the start of a connection. Press Connect on another card to finish, or press again to cancel.`
+            : ` ${card.title} to another card`}
+        </span>
+      </button>
 
       <div className="px-2.5 pt-1.5 min-w-0">
         <h3 className="font-heading text-[13px] font-semibold leading-snug line-clamp-2">

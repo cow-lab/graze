@@ -26,6 +26,13 @@ export async function createPost(
 async function createPostInner(formData: FormData): Promise<string | undefined> {
   const userId = await requireUserId();
 
+  // Server-side twin of the checkbox in SubmitForm. Content becomes public and files are
+  // stored publicly, so the record that someone affirmed they had the right to share it
+  // must not depend on client-side validation.
+  if (formData.get("rightsAcknowledged") !== "yes") {
+    return "Please confirm you have the right to share this and understand it will be public.";
+  }
+
   const title = String(formData.get("title") ?? "").trim();
   // Several Fields, not one — checkboxes rather than a dropdown, pre-ticked by the same
   // keyword matcher The Combine uses (see components/FieldPicker.tsx).
