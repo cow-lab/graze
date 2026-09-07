@@ -23,7 +23,9 @@ const SNIPPET_CHARS = 110;
 function snippetFor(post: PostListItem): string {
   const text = post.abstract;
   if (!text) return "";
-  return text.length > SNIPPET_CHARS ? `${text.slice(0, SNIPPET_CHARS).trimEnd()}…` : text;
+  return text.length > SNIPPET_CHARS
+    ? `${text.slice(0, SNIPPET_CHARS).trimEnd()}…`
+    : text;
 }
 
 export default function PostCard({
@@ -42,7 +44,7 @@ export default function PostCard({
     // the title can't simply be wrapped in an <a> — interactive elements can't nest inside
     // one. Instead an absolutely-positioned link covers the card for the "click anywhere"
     // behaviour, and the genuinely interactive bits sit above it on z-10.
-    <article className="relative flex gap-3 rounded-lg border border-border-strong bg-panel px-4 py-3.5 shadow-sm transition hover:border-moss/60 hover:shadow-md">
+    <article className="relative rounded-lg border border-border-strong bg-panel px-4 py-3.5 shadow-sm transition hover:border-moss/60 hover:shadow-md">
       <Link
         href={`/post/${post.id}`}
         className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
@@ -50,16 +52,7 @@ export default function PostCard({
         <span className="sr-only">{post.title}</span>
       </Link>
 
-      <div className="relative z-10 pt-0.5">
-        <VoteButtons
-          postId={post.id}
-          score={post.score}
-          userVote={post.userVote}
-          isLoggedIn={isLoggedIn}
-        />
-      </div>
-
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0">
         <div className="relative z-10 mb-1.5 flex w-fit flex-wrap items-center gap-2">
           <FieldChips fields={post.fields} />
           <FieldTested
@@ -69,8 +62,14 @@ export default function PostCard({
               retracted: !!post.retractedAt,
             })}
             breakdown={{
-              peerReviewed: post.reliability === "PREPRINT" ? false : post.workType ? true : null,
-              doajListed: post.reliability === "PEER_REVIEWED_LISTED" ? true : null,
+              peerReviewed:
+                post.reliability === "PREPRINT"
+                  ? false
+                  : post.workType
+                    ? true
+                    : null,
+              doajListed:
+                post.reliability === "PEER_REVIEWED_LISTED" ? true : null,
               retracted: !!post.retractedAt,
               retractionChecked: post.source === "COMBINE",
               citationCount: post.citationCount,
@@ -86,7 +85,11 @@ export default function PostCard({
         {post.explainer?.tldr ? (
           // The lowest-effort tier of "Chew on this", visible without clicking anything.
           <p className="mt-1.5 flex items-start gap-1.5 text-[13px] leading-relaxed text-fg">
-            <Sparkles size={13} className="mt-0.5 shrink-0 text-teal" aria-hidden="true" />
+            <Sparkles
+              size={13}
+              className="mt-0.5 shrink-0 text-teal"
+              aria-hidden="true"
+            />
             <span className="line-clamp-2">{post.explainer.tldr}</span>
           </p>
         ) : (
@@ -111,6 +114,15 @@ export default function PostCard({
             initialOnBoard={isOnBoard}
             isLoggedIn={isLoggedIn}
           />
+          <div className="inline-flex items-center rounded-md border border-border-strong bg-panel px-1.5 py-0.5 shadow-sm">
+            <VoteButtons
+              postId={post.id}
+              score={post.score}
+              userVote={post.userVote}
+              isLoggedIn={isLoggedIn}
+              orientation="horizontal"
+            />
+          </div>
         </div>
         <div className="relative z-10 mt-2.5 flex w-fit flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] tabular-nums text-fg-muted">
           <AuthorDisplay
@@ -121,7 +133,8 @@ export default function PostCard({
           />
           <span aria-hidden="true">·</span>
           <span>
-            {post._count.comments} {post._count.comments === 1 ? "comment" : "comments"}
+            {post._count.comments}{" "}
+            {post._count.comments === 1 ? "comment" : "comments"}
           </span>
           <span aria-hidden="true">·</span>
           <span>{timeAgo(post.createdAt)}</span>
@@ -130,7 +143,10 @@ export default function PostCard({
               <span aria-hidden="true">·</span>
               <span className="inline-flex items-center gap-1">
                 <Quote size={11} aria-hidden="true" />{" "}
-                <span className="tabular-nums">{post.citationCount.toLocaleString()}</span> citations
+                <span className="tabular-nums">
+                  {post.citationCount.toLocaleString()}
+                </span>{" "}
+                citations
               </span>
             </>
           )}

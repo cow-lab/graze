@@ -45,35 +45,41 @@ const STATES: Record<
 > = {
   TESTED: {
     label: "Field-Tested",
-    tone: "border-moss bg-moss text-white",
+    // Quiet on purpose. This is the state nearly every card is in, so a filled badge made
+    // the least informative thing on the card the loudest — a wall of dark green pills
+    // shouting above the titles they belonged to. Weight is spent on the exceptions below.
+    tone: "border-moss/40 bg-moss/10 text-moss",
     icon: BadgeCheck,
     meaning:
       "Peer-reviewed, published in a DOAJ-listed journal, and carrying no retraction notice. That's a check on the journal and the paper's status — not a judgement of whether the paper is any good, which is still yours to make.",
   },
   PARTIAL: {
     label: "Partly checked",
-    tone: "border-border-strong bg-panel text-fg",
+    tone: "border-border-strong bg-panel-2 text-fg-muted",
     icon: CircleHelp,
     meaning:
       "Peer-reviewed, but its journal isn't listed in DOAJ. One check passed, one didn't — and DOAJ only covers open-access journals, so a subscription journal lands here no matter how good it is.",
   },
   UNCHECKED: {
     label: "Not yet checked",
-    tone: "border-border-strong bg-panel text-fg-muted",
+    tone: "border-border-strong bg-panel-2 text-fg-muted",
     icon: CircleHelp,
     meaning:
       "None of the checks have run against this one. Live search results start here — adding a paper to Graze is what runs them.",
   },
   FLAGGED: {
     label: "Flagged",
-    tone: "border-sun bg-sun/30 text-ink",
+    // The one state a reader must not scroll past, so it's the only filled badge here.
+    tone: "border-sun bg-sun text-ink font-semibold",
     icon: Flag,
     meaning:
       "Either a retraction notice exists for this paper, or two sources disagree about its journal. It's shown rather than hidden, and it's queued for a person to look at — nothing here was resolved automatically.",
   },
   PREPRINT: {
     label: "Preprint",
-    tone: "border-teal/50 bg-teal/10 text-teal",
+    // Neutral rather than teal: teal means "Chew on this" everywhere else, and a preprint
+    // badge borrowing it read as an action. This is information, not something to click.
+    tone: "border-ink/25 bg-ink/5 text-ink",
     icon: FlaskConical,
     meaning:
       "Posted publicly before peer review. Not a failure state and not a lesser paper — just an earlier one. Plenty of important work appears as a preprint first; it simply hasn't been reviewed yet.",

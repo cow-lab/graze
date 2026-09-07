@@ -5,6 +5,7 @@ import CheckRetractionsButton from "@/components/CheckRetractionsButton";
 import QueueActions from "@/components/QueueActions";
 import AdminNav from "@/components/AdminNav";
 import EmptyState from "@/components/EmptyState";
+import { PAGE_HEADER } from "@/lib/surfaces";
 
 export default async function AdminQueuePage() {
   await requireAdminUser();
@@ -20,7 +21,7 @@ export default async function AdminQueuePage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm mb-6">
+      <div className={`${PAGE_HEADER} mb-6`}>
         <h1 className="font-heading text-2xl font-semibold mb-1">Moderation queue</h1>
         <p className="text-sm text-fg-muted mb-4">
           Research that passes every check — peer-reviewed work type, DOAJ-listed journal, no

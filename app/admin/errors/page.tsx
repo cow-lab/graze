@@ -4,6 +4,7 @@ import { metricSnapshot } from "@/lib/metrics";
 import AdminNav from "@/components/AdminNav";
 import SectionHeading from "@/components/SectionHeading";
 import EmptyState from "@/components/EmptyState";
+import { PAGE_HEADER } from "@/lib/surfaces";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function AdminErrorsPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm mb-8">
+      <div className={`${PAGE_HEADER} mb-8`}>
         <h1 className="font-heading text-2xl font-semibold mb-1">Errors &amp; usage</h1>
         <p className="text-sm text-fg-muted">
           Server and client errors are captured automatically rather than needing to be

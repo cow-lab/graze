@@ -6,6 +6,7 @@ import ResearchCard from "@/components/ResearchCard";
 import { tabClass } from "@/lib/tabStyles";
 import EmptyState from "@/components/EmptyState";
 import { buttonClass } from "@/lib/controls";
+import { PAGE_HEADER } from "@/lib/surfaces";
 
 const SORT_TABS: SortOption[] = ["cited", "discussed", "new"];
 
@@ -27,7 +28,7 @@ export default async function ResearchLibraryPage({
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm mb-6">
+      <div className={`${PAGE_HEADER} mb-6`}>
         <div className="flex items-center justify-between gap-4 flex-wrap mb-1">
           <h1 className="font-heading text-2xl font-semibold">Research library</h1>
           <Link
@@ -56,7 +57,7 @@ export default async function ResearchLibraryPage({
             name="q"
             defaultValue={params.q}
             placeholder="Filter this library…"
-            className="flex-1 bg-panel-2 border border-border rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-1 focus:ring-moss"
+            className="flex-1 bg-panel border border-border-strong rounded-md px-3 py-2 text-sm text-fg placeholder:text-fg-muted focus:outline-none focus:ring-1 focus:ring-moss"
           />
           {sort !== DEFAULT_SORT && <input type="hidden" name="sort" value={sort} />}
           <button

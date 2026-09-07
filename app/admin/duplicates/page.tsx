@@ -5,6 +5,7 @@ import { normalizeTitle } from "@/lib/combine/utils";
 import MergePostsButton from "@/components/MergePostsButton";
 import AdminNav from "@/components/AdminNav";
 import EmptyState from "@/components/EmptyState";
+import { PAGE_HEADER } from "@/lib/surfaces";
 
 export default async function AdminDuplicatesPage() {
   await requireAdminUser();
@@ -36,7 +37,7 @@ export default async function AdminDuplicatesPage() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm mb-8">
+      <div className={`${PAGE_HEADER} mb-8`}>
         <h1 className="font-heading text-2xl font-semibold mb-1">Possible duplicate research</h1>
         <p className="text-sm text-fg-muted">
           These share an exact normalized title — usually a preprint and its published version

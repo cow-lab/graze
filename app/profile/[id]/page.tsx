@@ -7,6 +7,7 @@ import SectionHeading from "@/components/SectionHeading";
 import EmptyState from "@/components/EmptyState";
 import { type PostListItem } from "@/lib/posts";
 import { getBoardedPostIds } from "@/lib/board";
+import { PAGE_HEADER } from "@/lib/surfaces";
 
 const authorSelect = {
   id: true,
@@ -77,7 +78,7 @@ export default async function ProfilePage({
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="bg-panel/95 border border-border-strong rounded-lg p-5 mb-6 shadow-sm">
+      <div className={`${PAGE_HEADER} mb-6`}>
         <div className="flex items-center gap-2 flex-wrap">
           <h1 className="font-heading text-2xl font-semibold">{user.name}</h1>
         </div>

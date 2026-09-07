@@ -23,6 +23,8 @@ import { assessJournal } from "@/lib/credibility";
 import { parseKeyFindings } from "@/lib/explainer";
 import { prisma } from "@/lib/prisma";
 import { plural, timeAgo } from "@/lib/utils";
+import { PANEL } from "@/lib/surfaces";
+import { buttonClass } from "@/lib/controls";
 
 export default async function PostDetailPage({
   params,
@@ -42,7 +44,9 @@ export default async function PostDetailPage({
   const [comments, boardCard, relatedPapers, journal] = await Promise.all([
     getCommentTree(post.id, session?.user?.id),
     session?.user?.id
-      ? prisma.canvasCard.findFirst({ where: { userId: session.user.id, postId: post.id } })
+      ? prisma.canvasCard.findFirst({
+          where: { userId: session.user.id, postId: post.id },
+        })
       : null,
     post.doi ? getRelatedPapers(post.doi) : Promise.resolve([]),
     // The thorough check: one journal, every source including the per-journal ones the
@@ -53,19 +57,15 @@ export default async function PostDetailPage({
   // What the "go and read it" links should point at, best first: a free full text if the
   // paper carries one, otherwise the publisher's page via its DOI.
   const sourceUrl =
-    post.externalUrl ?? post.fileUrl ?? (post.doi ? `https://doi.org/${post.doi}` : null);
+    post.externalUrl ??
+    post.fileUrl ??
+    (post.doi ? `https://doi.org/${post.doi}` : null);
   const paperRef = { postId: post.id, doi: post.doi };
 
   return (
     <div className="max-w-3xl mx-auto flex flex-col gap-6">
-      <div className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm">
+      <div className={PANEL}>
         <div className="flex gap-4">
-          <VoteButtons
-            postId={post.id}
-            score={post.score}
-            userVote={post.userVote}
-            isLoggedIn={isLoggedIn}
-          />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
@@ -77,11 +77,16 @@ export default async function PostDetailPage({
                   })}
                   breakdown={{
                     peerReviewed:
-                      post.reliability === "PREPRINT" ? false : post.workType ? true : null,
+                      post.reliability === "PREPRINT"
+                        ? false
+                        : post.workType
+                          ? true
+                          : null,
                     doajListed:
                       post.reliability === "PEER_REVIEWED_LISTED"
                         ? true
-                        : journal.indexes.find((index) => index.name === "DOAJ")?.state === "in"
+                        : journal.indexes.find((index) => index.name === "DOAJ")
+                              ?.state === "in"
                           ? true
                           : null,
                     retracted: !!post.retractedAt,
@@ -103,7 +108,9 @@ export default async function PostDetailPage({
                 {isAuthor && <DeletePostButton postId={post.id} />}
               </div>
             </div>
-            <h1 className="font-heading text-2xl font-semibold leading-tight">{post.title}</h1>
+            <h1 className="font-heading text-2xl font-semibold leading-tight">
+              {post.title}
+            </h1>
             <div className="flex items-center gap-2 mt-2 font-mono text-[11px] text-fg-muted flex-wrap">
               <AuthorDisplay
                 userId={post.author.id}
@@ -125,18 +132,21 @@ export default async function PostDetailPage({
                 {post.doi && <span>DOI: {post.doi}</span>}
                 {post.citationCount != null && (
                   <span className="inline-flex items-center gap-1">
-                    <Quote size={11} aria-hidden="true" /> {post.citationCount.toLocaleString()} citations
+                    <Quote size={11} aria-hidden="true" />{" "}
+                    {post.citationCount.toLocaleString()} citations
                   </span>
                 )}
               </div>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.abstract}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {post.abstract}
+              </p>
               <div className="flex items-center gap-3 flex-wrap">
                 {post.externalUrl && (
                   <SourceLink
                     href={post.externalUrl}
                     paper={paperRef}
                     showIcon={false}
-                    className="px-3 py-1.5 rounded-md border border-border text-sm text-fg hover:border-moss hover:text-moss transition"
+                    className={buttonClass("quiet")}
                   >
                     View external link ↗
                   </SourceLink>
@@ -146,7 +156,7 @@ export default async function PostDetailPage({
                     href={post.fileUrl}
                     paper={paperRef}
                     showIcon={false}
-                    className="px-3 py-1.5 rounded-md border border-border text-sm text-fg hover:border-moss hover:text-moss transition"
+                    className={buttonClass("quiet")}
                   >
                     Download PDF ↓
                   </SourceLink>
@@ -159,7 +169,9 @@ export default async function PostDetailPage({
                     language={post.language}
                     explainer={{
                       tldr: post.explainer.tldr,
-                      keyFindings: parseKeyFindings(post.explainer.keyFindingsJson),
+                      keyFindings: parseKeyFindings(
+                        post.explainer.keyFindingsJson,
+                      ),
                       summary: post.explainer.summary,
                       terms: JSON.parse(post.explainer.termsJson),
                       quiz: JSON.parse(post.explainer.quizJson),
@@ -167,6 +179,15 @@ export default async function PostDetailPage({
                     }}
                   />
                 )}
+                <div className="inline-flex items-center rounded-md border border-border-strong bg-panel px-1.5 py-0.5 shadow-sm">
+                  <VoteButtons
+                    postId={post.id}
+                    score={post.score}
+                    userVote={post.userVote}
+                    isLoggedIn={isLoggedIn}
+                    orientation="horizontal"
+                  />
+                </div>
               </div>
 
               <RelatedPapers papers={relatedPapers} />
@@ -175,14 +196,15 @@ export default async function PostDetailPage({
         </div>
       </div>
 
-      <div id="comments" className="bg-panel/95 border border-border-strong rounded-lg p-5 shadow-sm">
+      <div id="comments" className={PANEL}>
         <h2 className="font-heading text-base font-semibold mb-1">
           {post._count.comments} Comments
         </h2>
         <p className="text-sm text-fg-muted mb-3">
-          The summary above is machine-written and the abstract is the authors&apos; own pitch.
-          This is where people who read the paper say what it actually found, what the summary
-          missed, and which part is worth your time.
+          The summary above is machine-written and the abstract is the
+          authors&apos; own pitch. This is where people who read the paper say
+          what it actually found, what the summary missed, and which part is
+          worth your time.
         </p>
         {isLoggedIn ? (
           <CommentForm postId={post.id} />
