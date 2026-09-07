@@ -274,7 +274,7 @@ export default function ExplainerPanel({
               <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-panel/95 backdrop-blur-sm border-b border-border px-5 py-3">
                 <h2
                   id={titleId}
-                  className="font-heading text-sm font-semibold uppercase tracking-wide text-fg-muted flex items-center gap-1.5"
+                  className="font-mono text-xs font-medium uppercase tracking-wide text-fg-muted flex items-center gap-1.5"
                 >
                   <Sparkles
                     size={14}
@@ -330,7 +330,7 @@ export default function ExplainerPanel({
                     )}
 
                     <div className="flex items-center justify-between gap-3 flex-wrap mb-1.5">
-                      <h3 className="font-heading text-sm font-semibold uppercase tracking-wide text-fg-muted">
+                      <h3 className="font-mono text-xs font-medium uppercase tracking-wide text-fg-muted">
                         Plain-language summary
                       </h3>
                       <ReadingControls />
@@ -370,7 +370,7 @@ export default function ExplainerPanel({
 
                     {data.keyFindings.length > 0 && (
                       <>
-                        <h3 className="font-heading text-sm font-semibold uppercase tracking-wide text-fg-muted mb-1.5">
+                        <h3 className="font-mono text-xs font-medium uppercase tracking-wide text-fg-muted mb-1.5">
                           Key findings
                         </h3>
                         <ul className="mb-5 flex flex-col gap-1.5">
@@ -397,7 +397,7 @@ export default function ExplainerPanel({
                       </>
                     )}
 
-                    <h3 className="font-heading text-sm font-semibold uppercase tracking-wide text-fg-muted mb-1.5">
+                    <h3 className="font-mono text-xs font-medium uppercase tracking-wide text-fg-muted mb-1.5">
                       Glossary
                     </h3>
                     <dl className="mb-5 flex flex-col gap-1.5">
@@ -412,7 +412,7 @@ export default function ExplainerPanel({
                       ))}
                     </dl>
 
-                    <h3 className="font-heading text-sm font-semibold uppercase tracking-wide text-fg-muted mb-2">
+                    <h3 className="font-mono text-xs font-medium uppercase tracking-wide text-fg-muted mb-2">
                       Comprehension check
                     </h3>
                     <div className="flex flex-col gap-4">

@@ -48,10 +48,20 @@
   --color-fg: var(--color-fg);
   --color-fg-muted: var(--color-fg-muted);
 
-  --font-heading: var(--font-space-grotesk);
+  --font-heading: var(--font-fraunces);
   --font-sans: var(--font-inter);
   --font-mono: var(--font-plex-mono);
   --font-hand: var(--font-caveat);
+
+  /* Shadows carry the ink hue rather than neutral black. Every surface here sits on cream
+     or on the green field, and a grey-black shadow over a warm ground reads as dirt — it
+     desaturates the colour underneath instead of looking like shade. Tinting to the same
+     warm near-black as the text keeps the light source consistent across the page. */
+  --shadow-2xs: 0 1px 0 0 rgb(43 42 31 / 0.04);
+  --shadow-xs: 0 1px 2px 0 rgb(43 42 31 / 0.06);
+  --shadow-sm: 0 1px 2px 0 rgb(43 42 31 / 0.07), 0 1px 1px -1px rgb(43 42 31 / 0.06);
+  --shadow-md: 0 4px 8px -3px rgb(43 42 31 / 0.11), 0 2px 4px -2px rgb(43 42 31 / 0.07);
+  --shadow-lg: 0 12px 22px -8px rgb(43 42 31 / 0.16), 0 4px 8px -4px rgb(43 42 31 / 0.08);
 }
 
 /* The Discover hero bleeds to 100vw out of the centred column, which can exceed the
@@ -69,6 +79,30 @@ body {
   background: var(--color-cream);
   color: var(--color-fg);
   font-family: var(--font-sans);
+}
+
+/* Headings break across lines evenly rather than dropping a single orphaned word onto the
+   last line, which happens constantly with paper titles at card width. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+/* Fraunces is an old-style serif and sets a touch loose at display sizes. */
+h1,
+h2 {
+  letter-spacing: -0.015em;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 ::selection {

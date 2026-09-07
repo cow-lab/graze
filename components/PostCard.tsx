@@ -42,7 +42,7 @@ export default function PostCard({
     // the title can't simply be wrapped in an <a> — interactive elements can't nest inside
     // one. Instead an absolutely-positioned link covers the card for the "click anywhere"
     // behaviour, and the genuinely interactive bits sit above it on z-10.
-    <div className="relative flex gap-3 rounded-lg border border-border-strong bg-panel px-4 py-3.5 shadow-sm transition hover:border-moss/60 hover:shadow-md">
+    <article className="relative flex gap-3 rounded-lg border border-border-strong bg-panel px-4 py-3.5 shadow-sm transition hover:border-moss/60 hover:shadow-md">
       <Link
         href={`/post/${post.id}`}
         className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
@@ -112,7 +112,7 @@ export default function PostCard({
             isLoggedIn={isLoggedIn}
           />
         </div>
-        <div className="relative z-10 mt-2.5 flex w-fit flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-fg-muted">
+        <div className="relative z-10 mt-2.5 flex w-fit flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] tabular-nums text-fg-muted">
           <AuthorDisplay
             userId={post.author.id}
             name={post.author.name}
@@ -129,12 +129,13 @@ export default function PostCard({
             <>
               <span aria-hidden="true">·</span>
               <span className="inline-flex items-center gap-1">
-                <Quote size={11} aria-hidden="true" /> {post.citationCount.toLocaleString()} citations
+                <Quote size={11} aria-hidden="true" />{" "}
+                <span className="tabular-nums">{post.citationCount.toLocaleString()}</span> citations
               </span>
             </>
           )}
         </div>
       </div>
-    </div>
+    </article>
   );
 }

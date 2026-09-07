@@ -8,7 +8,7 @@
 // the same row line up instead of nearly lining up.
 
 const BASE =
-  "inline-flex items-center justify-center gap-1.5 rounded-md font-medium shadow-sm transition disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2";
+  "inline-flex items-center justify-center gap-1.5 rounded-md font-medium shadow-sm transition duration-150 active:translate-y-px active:shadow-2xs motion-reduce:active:translate-y-0 disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2";
 
 const SIZES = {
   /** Secondary actions sharing a row with body text or metadata. */

@@ -27,7 +27,7 @@ export default function ResearchCard({
   return (
     // Same overlay-link pattern as PostCard: jargon terms are buttons and can't live
     // inside an <a>, so the link covers the card instead of wrapping the content.
-    <div className="relative flex gap-3 rounded-lg border border-border-strong bg-panel px-4 py-3.5 shadow-sm transition hover:border-moss/60 hover:shadow-md">
+    <article className="relative flex gap-3 rounded-lg border border-border-strong bg-panel px-4 py-3.5 shadow-sm transition hover:border-moss/60 hover:shadow-md">
       <Link
         href={`/post/${post.id}`}
         className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"
@@ -73,7 +73,8 @@ export default function ResearchCard({
             <>
               {" · "}
               <span className="inline-flex items-center gap-1 align-middle">
-                <Quote size={11} aria-hidden="true" /> {post.citationCount.toLocaleString()} citations
+                <Quote size={11} aria-hidden="true" />{" "}
+                <span className="tabular-nums">{post.citationCount.toLocaleString()}</span> citations
               </span>
             </>
           )}
@@ -99,7 +100,7 @@ export default function ResearchCard({
           />
         </div>
 
-        <div className="relative z-10 mt-2.5 flex w-fit flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-fg-muted">
+        <div className="relative z-10 mt-2.5 flex w-fit flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] tabular-nums text-fg-muted">
           <AuthorDisplay
             userId={post.author.id}
             name={post.author.name}
@@ -113,6 +114,6 @@ export default function ResearchCard({
           <FieldChips fields={post.fields} />
         </div>
       </div>
-    </div>
+    </article>
   );
 }
