@@ -1,21 +1,22 @@
-import Link from "next/link";
 import CowAvatar from "@/components/CowAvatar";
 
 // Renders wherever an author's name shows — post cards, comments, post detail. Handles
 // the anonymous case itself so callers never have to branch on it: pass the real author
 // plus the post/comment's own `isAnonymous` flag, and this decides what's actually shown.
+//
+// Names are never links: profile pages are private now (see app/profile/[id]/page.tsx),
+// visible only to the account owner, so a link on someone else's name would just 404 —
+// and a link on your own would only be worth it from your own post, which the header's
+// own profile link already covers.
 export default function AuthorDisplay({
-  userId,
   name,
   isAnonymous,
   cowNumber,
-  linkToProfile = true,
 }: {
   userId: string;
   name: string;
   isAnonymous: boolean;
   cowNumber: number | null;
-  linkToProfile?: boolean;
 }) {
   if (isAnonymous) {
     return (
@@ -26,15 +27,5 @@ export default function AuthorDisplay({
     );
   }
 
-  return (
-    <span className="inline-flex items-center">
-      {linkToProfile ? (
-        <Link href={`/profile/${userId}`} className="hover:text-ink transition-colors">
-          {name}
-        </Link>
-      ) : (
-        <span>{name}</span>
-      )}
-    </span>
-  );
+  return <span className="inline-flex items-center">{name}</span>;
 }

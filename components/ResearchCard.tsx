@@ -119,7 +119,6 @@ export default function ResearchCard({
             name={post.author.name}
             isAnonymous={post.isAnonymous}
             cowNumber={post.author.cowNumber}
-            linkToProfile={false}
           />
           <span aria-hidden="true">·</span>
           <span>{plural(post.viewCount, "view")}</span>

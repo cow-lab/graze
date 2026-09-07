@@ -24,6 +24,12 @@ export default async function ProfilePage({
   const session = await auth();
   const isOwnProfile = session?.user?.id === id;
 
+  // This page is private now — reputation and post history were visible to anyone who
+  // clicked a name, which was more public surface than the project needs. Only the
+  // account owner can view it; everyone else gets the same not-found page a nonexistent
+  // id would produce, so this also doesn't confirm or deny that a given user id exists.
+  if (!isOwnProfile) notFound();
+
   const user = await prisma.user.findUnique({
     where: { id },
     include: {
@@ -82,6 +88,7 @@ export default async function ProfilePage({
         <div className="flex items-center gap-2 flex-wrap">
           <h1 className="font-heading text-2xl font-semibold">{user.name}</h1>
         </div>
+        <p className="mt-1 text-xs text-fg-muted">Only visible to you.</p>
         <div className="flex items-center gap-6 mt-3 font-mono text-xs text-fg-muted">
           <span>
             <span className="text-fg text-sm font-medium">{reputation}</span> reputation
