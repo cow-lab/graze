@@ -9,20 +9,20 @@
 // unfilled one is impossible to miss in review or on the rendered page.
 
 /** Your legal name, or the registered business name if you incorporate later. */
-export const OPERATOR_NAME = "[PLACEHOLDER: your full legal name or registered business name]";
+export const OPERATOR_NAME = "Haoyuan";
 
 /**
  * The address for privacy requests, general support, and legal notices. A real, monitored
  * mailbox — GDPR gives people a right to reach the controller, and an unmonitored address
  * fails that on its own.
  */
-export const CONTACT_EMAIL = "[PLACEHOLDER: contact@yourdomain.example]";
+export const CONTACT_EMAIL = "haoyuansun001@gmail.com";
 
 /**
  * The country you operate from. This is not cosmetic: it decides which rules bind you.
  * See POSTAL_ADDRESS below and the deployment notes in the project summary.
  */
-export const OPERATOR_COUNTRY = "[PLACEHOLDER: country you operate from, e.g. United Kingdom]";
+export const OPERATOR_COUNTRY = "Canada";
 
 /**
  * A geographic address.
@@ -42,14 +42,13 @@ export const OPERATOR_COUNTRY = "[PLACEHOLDER: country you operate from, e.g. Un
  * office service rather than omitting it. Set to null to hide the address line entirely
  * while you decide — do not leave a fake one.
  */
-export const POSTAL_ADDRESS: string | null =
-  "[PLACEHOLDER: geographic address, or set this to null — see the note in lib/legal.ts]";
+export const POSTAL_ADDRESS: string | null = null;
 
 /**
  * Update whenever the substance of a policy changes, not on every typo fix. People rely on
  * this date to tell whether the terms they agreed to are the terms now in force.
  */
-export const POLICY_LAST_UPDATED = "[PLACEHOLDER: date you publish these, e.g. 7 September 2026]";
+export const POLICY_LAST_UPDATED = "8 September 2026";
 
 /** The minimum age to hold an account. See the note in app/terms/page.tsx. */
 export const MINIMUM_AGE = 16;

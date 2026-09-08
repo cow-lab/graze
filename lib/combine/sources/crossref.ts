@@ -26,11 +26,11 @@ export async function searchCrossref(keywords: string[], limit = 5): Promise<Com
     url.searchParams.set("query.bibliographic", query);
     url.searchParams.set("rows", String(limit));
     url.searchParams.set("filter", "type:journal-article");
-    url.searchParams.set("mailto", "graze-combine@example.com");
+    url.searchParams.set("mailto", "haoyuansun001@gmail.com");
 
     try {
       const res = await fetchWithBackoff(url.toString(), {
-        headers: { "User-Agent": "Graze/1.0 (The Combine; mailto:graze-combine@example.com)" },
+        headers: { "User-Agent": "Graze/1.0 (The Combine; mailto:haoyuansun001@gmail.com)" },
       });
       if (!res.ok) return [];
       const data = (await res.json()) as { message?: { items?: CrossrefWork[] } };

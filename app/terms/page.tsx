@@ -155,11 +155,10 @@ export default function Terms() {
         to use Graze means the new version applies.
       </p>
       <p>
-        <strong>
-          [PLACEHOLDER: governing law and courts — normally the country you operate from.
-          Confirm with a lawyer, since consumer-protection rules can give users in the EU/UK
-          the right to rely on their own local law regardless of what is written here.]
-        </strong>
+        These terms are governed by the laws of British Columbia, Canada, without regard to
+        conflict-of-law principles. If you are a consumer resident in the EU, UK, or
+        elsewhere, mandatory consumer-protection laws where you live may still apply and can
+        take precedence over this clause.
       </p>
     </LegalPage>
   );

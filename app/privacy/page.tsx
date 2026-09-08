@@ -147,12 +147,11 @@ export default function PrivacyPolicy() {
         </Item>
       </ul>
       <p>
-        Some of these process data outside the UK/EU. Where that happens, transfers rely on
-        the providers&apos; own safeguards, such as Standard Contractual Clauses.{" "}
-        <strong>
-          [PLACEHOLDER: confirm the transfer safeguards your chosen hosting and database
-          providers actually offer, and name them here.]
-        </strong>
+        Vercel, the database host, and Anthropic are all based in the United States; the
+        academic sources above are hosted internationally. Where these providers publish
+        Standard Contractual Clauses or an equivalent safeguard, transfers rely on those.
+        Graze is a non-commercial, one-person project and does not have separate
+        data-transfer agreements of its own with any of them.
       </p>
 
       <h2>How long it is kept</h2>
