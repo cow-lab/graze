@@ -101,13 +101,18 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         >
           Skip to content
         </a>
-        <div className="relative min-h-full">
+        {/* min-h-dvh, not min-h-full: `min-height: 100%` resolves against the parent's
+            height, and body's height is auto, so the percentage collapsed and this wrapper
+            only grew to fit its content. On a short page that left the footer floating
+            mid-screen with a band of bare field beneath it. A viewport unit is definite, so
+            `flex-1` on <main> can actually push the footer to the bottom of the screen. */}
+        <div className="relative min-h-dvh">
           {/* Genuinely not rendered in low-bandwidth mode: the inline sky SVG and the
               repeating field tile never reach the HTML, rather than being downloaded and
               then hidden with CSS. That's the difference between saving bytes and just
               looking simpler. */}
           {!lowBandwidth && <GrazeBackground />}
-          <div className="relative z-[2] flex flex-col min-h-full">
+          <div className="relative z-[2] flex min-h-dvh flex-col">
             <Header user={user} notifications={notifications} unreadCount={unreadCount} />
             <main id="main" className="flex-1 w-full max-w-6xl mx-auto px-4 py-6">
               <LowBandwidthSuggestion enabled={lowBandwidth} />

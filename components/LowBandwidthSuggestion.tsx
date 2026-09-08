@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore, useTransition } from "react";
 import { Gauge, X } from "lucide-react";
 import { setLowBandwidth } from "@/lib/actions/preferences";
 import { buttonClass } from "@/lib/controls";
+import { NOTICE } from "@/lib/surfaces";
 
 const DISMISSED_KEY = "graze_lowbw_suggestion_dismissed";
 
@@ -53,7 +54,7 @@ export default function LowBandwidthSuggestion({ enabled }: { enabled: boolean }
   return (
     <div
       role="status"
-      className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-border-strong bg-panel/95 px-4 py-3 shadow-sm"
+      className={`${NOTICE} mb-4 flex items-start justify-between gap-3`}
     >
       <p className="text-sm text-fg-muted flex items-start gap-2">
         <Gauge size={14} aria-hidden="true" className="mt-0.5 shrink-0" />

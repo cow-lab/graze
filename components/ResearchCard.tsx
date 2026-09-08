@@ -27,7 +27,7 @@ export default function ResearchCard({
   return (
     // Same overlay-link pattern as PostCard: jargon terms are buttons and can't live
     // inside an <a>, so the link covers the card instead of wrapping the content.
-    <article className="relative rounded-lg border border-border-strong bg-panel px-4 py-3.5 shadow-sm transition hover:border-moss/60 hover:shadow-md">
+    <article className="relative rounded-lg border border-border-strong bg-panel px-4 py-3.5 shadow-sm transition duration-150 hover:-translate-y-0.5 hover:border-moss/60 hover:shadow-md motion-reduce:hover:translate-y-0">
       <Link
         href={`/post/${post.id}`}
         className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss"

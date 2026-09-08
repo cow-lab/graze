@@ -3,6 +3,7 @@
 import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
+import { NOTICE } from "@/lib/surfaces";
 
 const DISMISSED_KEY = "graze_cookie_notice_dismissed";
 
@@ -55,7 +56,7 @@ export default function CookieNotice() {
     <div
       role="note"
       aria-label="Cookie information"
-      className="mb-6 flex flex-wrap items-start gap-3 rounded-lg border border-border-strong bg-panel px-4 py-3 shadow-sm"
+      className={`${NOTICE} mb-6 flex flex-wrap items-start gap-3`}
     >
       <p className="min-w-0 flex-1 text-[13px] leading-relaxed text-fg">
         Graze uses one cookie to keep you signed in, and one to remember low-bandwidth mode
