@@ -33,8 +33,8 @@ export default async function ProfilePage({
   const user = await prisma.user.findUnique({
     where: { id },
     include: {
-      // All PUBLISHED posts (for reputation/upvote math — a private number, safe to
-      // include anonymous ones since nothing here is displayed per-post).
+      // All PUBLISHED posts (for reputation math — a private number, safe to include
+      // anonymous ones since nothing here is displayed per-post).
       posts: {
         where: { status: "PUBLISHED" },
         include: {
@@ -76,9 +76,16 @@ export default async function ProfilePage({
     user.posts.reduce((acc, p) => acc + postScore(p), 0) +
     user.comments.reduce((acc, c) => acc + commentScore(c), 0);
 
-  const upvotesReceived =
-    user.posts.reduce((acc, p) => acc + p.votes.filter((v) => v.value === "UP").length, 0) +
-    user.comments.reduce((acc, c) => acc + c.votes.filter((v) => v.value === "UP").length, 0);
+  // Replaces the old "upvotes received", which was the gross half of the reputation number
+  // beside it — two vote counts saying nearly the same thing, on a page only its owner can
+  // see. A popularity score with no audience measures nothing.
+  //
+  // This counts distinct papers where you followed the link to the actual source, which is
+  // the one thing Graze exists to cause. PaperEngagement is unique per (user, paper, kind),
+  // so a row count is a count of papers rather than of clicks.
+  const sourcesOpened = await prisma.paperEngagement.count({
+    where: { userId: id, kind: "SOURCE_CLICK" },
+  });
 
   const boardedIds = await getBoardedPostIds(session?.user?.id, postsWithScore.map((p) => p.id));
 
@@ -94,7 +101,8 @@ export default async function ProfilePage({
             <span className="text-fg text-sm font-medium">{reputation}</span> reputation
           </span>
           <span>
-            <span className="text-fg text-sm font-medium">{upvotesReceived}</span> upvotes received
+            <span className="text-fg text-sm font-medium">{sourcesOpened}</span>{" "}
+            {sourcesOpened === 1 ? "source opened" : "sources opened"}
           </span>
           <span>
             <span className="text-fg text-sm font-medium">{publicPosts.length}</span>{" "}
