@@ -58,7 +58,7 @@ export async function fetchJournals(issns: string[]): Promise<Map<string, OpenAl
       const url = new URL("https://api.openalex.org/sources");
       url.searchParams.set("filter", `issn:${batch.join("|")}`);
       url.searchParams.set("per-page", String(batch.length));
-      url.searchParams.set("mailto", "graze-credibility@example.com");
+      url.searchParams.set("mailto", "grazeoutreach@gmail.com");
 
       const res = await fetchWithBackoff(url.toString());
       if (!res.ok) continue;

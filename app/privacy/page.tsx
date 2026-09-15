@@ -18,9 +18,10 @@ export default function PrivacyPolicy() {
     >
       <h2>Who is responsible for your data</h2>
       <p>
-        Graze is run by {OPERATOR_NAME}, operating from {OPERATOR_COUNTRY}. Under the UK GDPR
-        and EU GDPR, that person is the <strong>data controller</strong> for the information
-        described here.
+        {OPERATOR_NAME} is an independent, non-commercial project operated from{" "}
+        {OPERATOR_COUNTRY} by a single person. Under the UK GDPR and EU GDPR, its operator is
+        the <strong>data controller</strong> for the information described here, and can be
+        reached at the address below.
         {POSTAL_ADDRESS ? ` Postal address: ${POSTAL_ADDRESS}.` : ""}
       </p>
       <p>

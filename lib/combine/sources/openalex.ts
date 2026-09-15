@@ -41,7 +41,7 @@ export async function searchOpenAlex(keywords: string[], limit = 5): Promise<Com
     url.searchParams.set("search", query);
     url.searchParams.set("per-page", String(limit));
     url.searchParams.set("filter", "has_abstract:true,type:article");
-    url.searchParams.set("mailto", "graze-combine@example.com");
+    url.searchParams.set("mailto", "grazeoutreach@gmail.com");
 
     try {
       const res = await fetchWithBackoff(url.toString());

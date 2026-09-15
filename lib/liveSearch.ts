@@ -59,7 +59,7 @@ export async function searchLiterature(
   url.searchParams.set("search", trimmed);
   url.searchParams.set("per-page", "20");
   url.searchParams.set("page", String(page));
-  url.searchParams.set("mailto", "graze-search@example.com");
+  url.searchParams.set("mailto", "grazeoutreach@gmail.com");
   // Filter at the API rather than post-hoc, so an open-access-only search still returns a
   // full page of results instead of a page thinned out by client-side filtering.
   if (opts.openAccessOnly) url.searchParams.set("filter", "is_oa:true");

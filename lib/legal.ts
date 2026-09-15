@@ -8,15 +8,22 @@
 // people. They are deliberately conspicuous rather than plausible-looking defaults, so an
 // unfilled one is impossible to miss in review or on the rendered page.
 
-/** Your legal name, or the registered business name if you incorporate later. */
-export const OPERATOR_NAME = "Haoyuan";
+/**
+ * The name the site is published under.
+ *
+ * Currently the project name rather than a person or a registered company. That reads fine
+ * in the footer and the copyright line, but note that GDPR Art. 13(1)(a) asks for the
+ * controller's *identity* — and with no entity registered, the controller in law is still
+ * the individual behind it, not the name on the page. See the note in the privacy policy.
+ */
+export const OPERATOR_NAME = "Graze";
 
 /**
  * The address for privacy requests, general support, and legal notices. A real, monitored
  * mailbox — GDPR gives people a right to reach the controller, and an unmonitored address
  * fails that on its own.
  */
-export const CONTACT_EMAIL = "haoyuansun001@gmail.com";
+export const CONTACT_EMAIL = "grazeoutreach@gmail.com";
 
 /**
  * The country you operate from. This is not cosmetic: it decides which rules bind you.
