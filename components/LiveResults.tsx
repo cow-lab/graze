@@ -81,6 +81,11 @@ export default async function LiveResults({
         workKind: classifyWork({ workType: result.workType }),
         retracted: retractions[i],
         citationCount: result.citationCount,
+        authors: {
+          total: result.authors_total,
+          withOrcid: result.authorsWithOrcid,
+          withRor: result.authorsWithRor,
+        },
       },
       (result.issn && facts.get(result.issn)) || null,
     ),

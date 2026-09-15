@@ -66,6 +66,8 @@ export type PaperFacts = {
   citationCount: number | null;
   /** False only when sources positively disagree about this DOI, not when unchecked. */
   metadataConsistent?: boolean | null;
+  /** Author verification, from the ORCID and ROR ids OpenAlex embeds. Omit when unknown. */
+  authors?: { total: number; withOrcid: number; withRor: number };
 };
 
 export type JournalFacts = (JournalCredibility & { flags: JournalFlag[] }) | null;
@@ -271,6 +273,42 @@ export function classify(paper: PaperFacts, journal: JournalFacts): Classificati
         "A pattern common among low-quality publishers. Only mentioned because nothing else vouched for this journal.",
       source: "Graze",
     });
+  }
+
+  // Author verification. Positive when present, silent when absent — never negative.
+  // ORCID launched in 2012, so a genuine 1998 paper has none, and penalising that would
+  // punish age rather than quality. ROR presence means OpenAlex resolved the author's
+  // stated affiliation to a registered organisation, not merely that a string was typed.
+  if (paper.authors && paper.authors.total > 0) {
+    const { total, withOrcid, withRor } = paper.authors;
+    if (withOrcid > 0) {
+      signals.push({
+        id: "authors.orcid",
+        weight: 2,
+        direction: "positive",
+        label:
+          withOrcid === total
+            ? `All ${total} authors have an ORCID iD`
+            : `${withOrcid} of ${total} authors have an ORCID iD`,
+        detail:
+          "An ORCID iD is a persistent identifier a researcher registers for themselves. Having one doesn't vouch for the work, and plenty of real researchers — especially before 2012 — don't have one.",
+        source: "ORCID via OpenAlex",
+      });
+    }
+    if (withRor > 0) {
+      signals.push({
+        id: "authors.ror",
+        weight: 2,
+        direction: "positive",
+        label:
+          withRor === total
+            ? `All ${total} authors list an institution in the Research Organization Registry`
+            : `${withRor} of ${total} authors list an institution in the Research Organization Registry`,
+        detail:
+          "The stated affiliation resolves to a registered organisation rather than being an unmatched string. It confirms the institution exists — not that the person works there.",
+        source: "ROR via OpenAlex",
+      });
+    }
   }
 
   // ── Weight 3 — context and ranking input only. Never changes the tier. ───────────────
