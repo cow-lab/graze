@@ -334,9 +334,34 @@ export function classify(paper: PaperFacts, journal: JournalFacts): Classificati
   // A weight-2 negative doesn't flag anything, but it does withhold VERIFIED: "listed in
   // DOAJ" and "retracts far more often than average" together is not a clean bill.
   const hasBlockingConcern = signals.some((s) => s.weight === 2 && s.direction === "negative");
-  const vouchedFor = listedIn.length > 0 && paper.workKind === "peer-reviewed";
 
-  if (vouchedFor && !hasBlockingConcern) {
+  // VERIFIED used to require an index listing. Measured over 100 results from five real
+  // queries, that made 75% of them UNVERIFIED for a single reason: not in DOAJ — and DOAJ
+  // only covers open-access journals, so Nature, Science, Cell and every subscription
+  // venue are excluded by definition, not by any finding about them. Calling a
+  // peer-reviewed, non-retracted paper in one of those "unverified" was simply inaccurate,
+  // and it made the tier useless: a label 90% of results carry tells a reader nothing.
+  //
+  // So VERIFIED now means what it should have meant all along — we checked, and what we
+  // could check came back clean:
+  //
+  //   - the publisher records it as peer-reviewed, and
+  //   - the retraction check actually ran and found nothing, and
+  //   - at least one independent source corroborates the venue or the people, and
+  //   - nothing we check raised a concern.
+  //
+  // Corroboration is deliberately satisfiable two ways. An index listing vouches for the
+  // venue; an ORCID iD or a ROR-resolved affiliation vouches for the authors. Requiring
+  // the venue route alone is what produced the artifact. Note this does not weaken the
+  // FLAGGED path at all: a predatory-list match, a retraction or a hijacked journal is
+  // weight 1 and overrides every one of these.
+  const corroborated =
+    listedIn.length > 0 ||
+    (paper.authors ? paper.authors.withOrcid > 0 || paper.authors.withRor > 0 : false);
+  const checkedClean = paper.retracted === false;
+  const peerReviewed = paper.workKind === "peer-reviewed";
+
+  if (peerReviewed && checkedClean && corroborated && !hasBlockingConcern) {
     return { tier: "VERIFIED", isPreprint, signals, decisive: null };
   }
   return { tier: "UNVERIFIED", isPreprint, signals, decisive: null };

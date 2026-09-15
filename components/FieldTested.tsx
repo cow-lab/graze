@@ -52,7 +52,7 @@ const STATES: Record<
     tone: "border-moss/40 bg-moss/10 text-moss",
     icon: BadgeCheck,
     meaning:
-      "Peer-reviewed, published in a DOAJ-listed journal, and carrying no retraction notice. That's a check on the journal and the paper's status — not a judgement of whether the paper is any good, which is still yours to make.",
+      "Peer-reviewed, no retraction on record, and corroborated by an index or by the authors' registered identities. That's a check on the paper's status — not a judgement of whether it's any good, which is still yours to make.",
   },
   PARTIAL: {
     label: "Partly checked",
@@ -81,7 +81,7 @@ const STATES: Record<
     tone: "border-border-strong bg-panel-2 text-fg-muted",
     icon: CircleHelp,
     meaning:
-      "The checks ran and nothing vouched for this journal, but nothing was wrong with it either. This is the ordinary state for a new, niche, or subscription journal — the indexes we check don't cover everything. It is not a mark against the work, and results here are never hidden or pushed down.",
+      "Some of the checks couldn't be completed — often a missing DOI, or authors we couldn't resolve. Nothing was wrong with it. Results here are never hidden or pushed down.",
   },
   PREPRINT: {
     label: "Preprint",
@@ -267,7 +267,15 @@ export default function FieldTested({
             <p className="text-xs leading-relaxed text-fg">{meaning}</p>
 
             {signals && signals.length > 0 ? (
-              <SignalList signals={signals} />
+              <>
+                <SignalList signals={signals} />
+                <a
+                  href="/how-we-check"
+                  className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide text-moss underline"
+                >
+                  How we check →
+                </a>
+              </>
             ) : (
             <>
             <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-fg-muted">
@@ -343,7 +351,12 @@ export default function FieldTested({
             </>
             )}
 
-            {journal && journal.indexes.length > 0 && (
+            {/* The older journal-level block. Everything in it — index states, fee
+                disclosure, citation context — is already in the signal list above, so
+                showing both duplicated each fact in different words and undid the point of
+                trimming the panel. Kept only for the call sites that don't pass signals
+                yet. */}
+            {!signals?.length && journal && journal.indexes.length > 0 && (
               <>
                 <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-fg-muted">
                   The journal
@@ -403,44 +416,23 @@ function SignalList({ signals }: { signals: Signal[] }) {
   return (
     <>
       {decisive.length > 0 && (
-        <SignalGroup
-          title="Checks that decide on their own"
-          note="A result here overrides everything else."
-          signals={decisive}
-        />
+        <SignalGroup title="Decides on its own" signals={decisive} />
       )}
       {contributing.length > 0 && (
-        <SignalGroup
-          title="What was checked"
-          note="These move a paper between verified and unverified. None of them can flag it."
-          signals={contributing}
-        />
+        <SignalGroup title="What was checked" signals={contributing} />
       )}
       {context.length > 0 && (
-        <SignalGroup
-          title="Context"
-          note="Shown so you can judge for yourself. Does not affect the result."
-          signals={context}
-        />
+        <SignalGroup title="Context — doesn't affect the result" signals={context} />
       )}
     </>
   );
 }
 
-function SignalGroup({
-  title,
-  note,
-  signals,
-}: {
-  title: string;
-  note: string;
-  signals: Signal[];
-}) {
+function SignalGroup({ title, signals }: { title: string; signals: Signal[] }) {
   return (
     <>
       <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-fg-muted">{title}</p>
-      <p className="mt-0.5 text-[10px] leading-snug text-fg-muted">{note}</p>
-      <ul className="mt-1.5 flex flex-col gap-1.5">
+      <ul className="mt-1.5 flex flex-col gap-1">
         {signals.map((signal) => {
           const tone =
             signal.direction === "positive"
@@ -449,27 +441,20 @@ function SignalGroup({
                 ? "text-rose"
                 : "text-fg-muted";
           return (
-            <li key={signal.id} className="text-[11px] leading-snug">
-              <span className={`font-medium ${tone}`}>{signal.label}</span>
-              {signal.detail && (
-                <span className="mt-0.5 block text-fg-muted">{signal.detail}</span>
+            <li key={signal.id} className="flex items-baseline justify-between gap-2 text-[11px] leading-snug">
+              <span className={tone}>{signal.label}</span>
+              {signal.evidenceUrl ? (
+                <a
+                  href={signal.evidenceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 font-mono text-[10px] text-fg-muted underline"
+                >
+                  {signal.source}
+                </a>
+              ) : (
+                <span className="shrink-0 font-mono text-[10px] text-fg-muted">{signal.source}</span>
               )}
-              <span className="mt-0.5 block font-mono text-[10px] text-fg-muted">
-                via {signal.source}
-                {signal.evidenceUrl && (
-                  <>
-                    {" · "}
-                    <a
-                      href={signal.evidenceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      evidence
-                    </a>
-                  </>
-                )}
-              </span>
             </li>
           );
         })}

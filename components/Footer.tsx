@@ -4,6 +4,7 @@ import CookieNotice from "@/components/CookieNotice";
 import { OPERATOR_NAME, CONTACT_EMAIL, POSTAL_ADDRESS } from "@/lib/legal";
 
 const LEGAL_LINKS = [
+  { href: "/how-we-check", label: "How we check" },
   { href: "/privacy", label: "Privacy" },
   { href: "/terms", label: "Terms" },
   { href: "/cookies", label: "Cookies" },
