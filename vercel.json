@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/combine",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/predatory-list",
+      "schedule": "0 5 * * 1"
     }
   ]
 }

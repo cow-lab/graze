@@ -70,8 +70,20 @@ export type PaperFacts = {
 
 export type JournalFacts = (JournalCredibility & { flags: JournalFlag[] }) | null;
 
-/** Journal-level flags that hard-flag a paper. See the note on RETRACTION_OUTLIER below. */
+/**
+ * Journal-level flags that hard-flag a paper, *when their severity says they're confirmed*.
+ *
+ * A PREDATORY_LIST flag at CAUTION is deliberately not one of these: the sync downgrades a
+ * match to CAUTION when the listed name is too generic to identify one journal, or when a
+ * reputable index vouches for the journal and the two sources therefore disagree. Those are
+ * held for a person to look at, not used to hide a result.
+ */
 const HARD_FLAG_KINDS = new Set<JournalFlag["kind"]>(["PREDATORY_LIST", "HIJACKED"]);
+
+function isConfirmedHardFlag(flag: JournalFlag): boolean {
+  if (flag.severity === "EXCLUDE") return true;
+  return HARD_FLAG_KINDS.has(flag.kind) && flag.severity !== "CAUTION";
+}
 
 export function classify(paper: PaperFacts, journal: JournalFacts): Classification {
   const signals: Signal[] = [];
@@ -106,7 +118,7 @@ export function classify(paper: PaperFacts, journal: JournalFacts): Classificati
   }
 
   for (const flag of journal?.flags ?? []) {
-    if (HARD_FLAG_KINDS.has(flag.kind) || flag.severity === "EXCLUDE") {
+    if (isConfirmedHardFlag(flag)) {
       const signal: Signal = {
         id: `flag.${flag.kind.toLowerCase()}`,
         weight: 1,
@@ -196,13 +208,15 @@ export function classify(paper: PaperFacts, journal: JournalFacts): Classificati
   // something about the journal's standards, but hard-flagging every paper in a journal
   // because of other papers' retractions would punish authors for their venue.
   for (const flag of journal?.flags ?? []) {
-    if (!HARD_FLAG_KINDS.has(flag.kind) && flag.severity !== "EXCLUDE") {
+    if (!isConfirmedHardFlag(flag)) {
       signals.push({
         id: `flag.${flag.kind.toLowerCase()}`,
         weight: 2,
         direction: "negative",
         label:
-          flag.kind === "RETRACTION_OUTLIER"
+          flag.kind === "PREDATORY_LIST"
+            ? "This journal matches a predatory-publisher list, but the match is disputed"
+            : flag.kind === "RETRACTION_OUTLIER"
             ? "This journal retracts papers far more often than average"
             : flag.kind === "REMOVED_FROM_INDEX"
               ? "This journal was removed from an index it used to be listed in"

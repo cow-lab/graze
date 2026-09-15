@@ -17,6 +17,9 @@ export default function AdminNav() {
         Possible duplicates
       </Link>{" "}
       ·{" "}
+      <Link href="/admin/credibility" className="text-moss hover:underline">
+        Credibility
+      </Link>
       <Link href="/admin/errors" className="text-moss hover:underline">
         Errors &amp; usage
       </Link>{" "}
