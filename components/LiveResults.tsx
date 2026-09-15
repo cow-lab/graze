@@ -3,7 +3,12 @@ import { parseTerms } from "@/lib/jargon";
 import { recordMetric } from "@/lib/metrics";
 import { getCurrentUser } from "@/lib/session";
 import { assignableFields, rankFields } from "@/lib/fieldMatch";
-import { assessMany } from "@/lib/credibility";
+import { journalFactsMany } from "@/lib/credibility";
+import { classify } from "@/lib/credibility/classify";
+import { assess } from "@/lib/credibility/assess";
+import { rankByCredibility } from "@/lib/credibility/rank";
+import { classifyWork } from "@/lib/combine/reliability";
+import { isDoiRetracted } from "@/lib/combine/retractionWatch";
 import { assessLiveResults } from "@/lib/liveFieldTested";
 import { searchLiterature } from "@/lib/liveSearch";
 import { captureError } from "@/lib/errorReporting";
@@ -58,15 +63,46 @@ export default async function LiveResults({
   // Journal credibility for every result on the page: cached rows plus one bulk OpenAlex
   // call for journals we haven't seen. The per-journal sources (MEDLINE, DOAJ's full
   // record) are left for the paper page, where it's one lookup instead of twenty.
-  const credibility = await assessMany(results.map((result) => result.issn));
+  const facts = await journalFactsMany(results.map((result) => result.issn));
 
-  // Results whose journal carries an EXCLUDE-severity flag are held back rather than shown.
-  // Held back, not deleted: the count and a way to see them stay on the page, because a
-  // research tool that silently pretends papers don't exist is its own kind of dishonest.
-  const flagged = results.filter(
-    (result) => result.issn && credibility.get(result.issn)?.tier === "EXCLUDED",
+  // The per-DOI retraction lookup, batched. Cached for a week by withCachedFact, so a
+  // repeated search costs nothing — but it has to happen before ranking, because a
+  // retraction is the one signal allowed to remove a result from the default list.
+  const retractions = await Promise.all(
+    results.map((result) => (result.doi ? isDoiRetracted(result.doi) : Promise.resolve(null))),
   );
-  const visible = showFlagged ? results : results.filter((result) => !flagged.includes(result));
+
+  // One classification per result, from the paper's own facts plus its journal's. This is
+  // the same function the badge reads, so what someone is told about a paper and where it
+  // ends up in the list can't disagree.
+  const classified = results.map((result, i) =>
+    classify(
+      {
+        workKind: classifyWork({ workType: result.workType }),
+        retracted: retractions[i],
+        citationCount: result.citationCount,
+      },
+      (result.issn && facts.get(result.issn)) || null,
+    ),
+  );
+
+  // Credibility as a ranking input rather than a badge: FLAGGED held back (not deleted —
+  // the count and a way to see them stay on the page), and VERIFIED work that is cited
+  // less than its page peers moves up. UNVERIFIED is never penalised.
+  const ranked = rankByCredibility(
+    results.map((result, i) => ({
+      item: result,
+      classification: classified[i],
+      citationCount: result.citationCount,
+    })),
+    { includeFlagged: showFlagged },
+  );
+  const visible = ranked.results;
+  const flaggedHeld = ranked.flaggedHeld;
+  // The badge UI still reads the older Assessment shape. Derived from the same facts here
+  // rather than re-fetched, so the badge and the ranking are looking at one set of data —
+  // migrating the badge to render classify()'s signal list directly is the next step.
+  const credibility = new Map([...facts].map(([issn, record]) => [issn, assess(record)]));
 
   // Glossaries already generated for any of these papers (by someone opening "Chew on
   // this" earlier) let cards underline jargon for free. One batched lookup keyed by DOI —
@@ -117,12 +153,13 @@ export default async function LiveResults({
 
   return (
     <>
-      {flagged.length > 0 && !showFlagged && (
+      {flaggedHeld > 0 && !showFlagged && (
         <p className="mb-3 rounded-lg border border-border-strong bg-panel/95 px-3 py-2 text-xs text-fg-muted shadow-sm">
-          {flagged.length} {flagged.length === 1 ? "result is" : "results are"} hidden — published
-          in {flagged.length === 1 ? "a journal" : "journals"} flagged by a source we track.{" "}
+          {flaggedHeld} {flaggedHeld === 1 ? "result is" : "results are"} hidden — either
+          retracted, or published in {flaggedHeld === 1 ? "a journal" : "journals"} flagged by
+          a source we track.{" "}
           <a href="?flagged=1" className="text-moss underline">
-            Show {flagged.length === 1 ? "it" : "them"} anyway
+            Show {flaggedHeld === 1 ? "it" : "them"} anyway
           </a>
         </p>
       )}

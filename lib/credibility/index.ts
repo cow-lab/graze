@@ -10,9 +10,32 @@ import { journalRetractionProfile } from "@/lib/combine/retractionWatch";
 import { scopeBreadth } from "@/lib/credibility/scope";
 import { assess, type Assessment } from "@/lib/credibility/assess";
 import { captureError } from "@/lib/errorReporting";
-import type { JournalCredibility } from "@prisma/client";
+import type { JournalCredibility, JournalFlag } from "@prisma/client";
 
-export type { Assessment, CredibilityTier } from "@/lib/credibility/assess";
+export type { Assessment } from "@/lib/credibility/assess";
+
+/**
+ * The raw stored facts for a page of journals, refreshed the same way assessMany does it.
+ *
+ * assessMany returns the *derived* Assessment, which is the wrong shape for the unified
+ * classifier in classify.ts — that needs the facts themselves so it can decide the tier and
+ * name every signal that produced it. Both share lookupMany, so a page of results still
+ * costs one bulk call.
+ */
+export async function journalFactsMany(
+  issns: (string | null | undefined)[],
+): Promise<Map<string, JournalCredibility & { flags: JournalFlag[] }>> {
+  try {
+    return await factsMany(issns);
+  } catch (error) {
+    // Same rule as assessMany: credibility is an input to how results are shown, and it
+    // must never be able to take the results themselves down. No facts means every result
+    // classifies as UNVERIFIED, which is the neutral tier — nothing gets hidden or buried
+    // because a lookup failed.
+    captureError({ error, source: "server", path: "/" });
+    return new Map();
+  }
+}
 
 // Journal facts change on the scale of months — a journal doesn't leave Scopus on a
 // Tuesday — so a long TTL keeps a page of search results down to one upstream call.
@@ -45,8 +68,19 @@ export async function assessMany(
 async function lookupMany(
   issns: (string | null | undefined)[],
 ): Promise<Map<string, Assessment>> {
-  const wanted = [...new Set(issns.filter((issn): issn is string => !!issn))];
+  const records = await factsMany(issns);
   const out = new Map<string, Assessment>();
+  for (const issn of new Set(issns.filter((i): i is string => !!i))) {
+    out.set(issn, assess(records.get(issn) ?? null));
+  }
+  return out;
+}
+
+async function factsMany(
+  issns: (string | null | undefined)[],
+): Promise<Map<string, JournalCredibility & { flags: JournalFlag[] }>> {
+  const wanted = [...new Set(issns.filter((issn): issn is string => !!issn))];
+  const out = new Map<string, JournalCredibility & { flags: JournalFlag[] }>();
   if (wanted.length === 0) return out;
 
   const cached = await prisma.journalCredibility.findMany({
@@ -87,7 +121,8 @@ async function lookupMany(
   }
 
   for (const issn of wanted) {
-    out.set(issn, assess(byIssn.get(issn) ?? null));
+    const record = byIssn.get(issn);
+    if (record) out.set(issn, record);
   }
   return out;
 }
