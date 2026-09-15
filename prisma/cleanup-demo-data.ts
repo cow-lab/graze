@@ -27,6 +27,10 @@ const FAKE_EMAILS = [
   "lars@nordicwind.no",
 ];
 
+// The address the seed used to create the admin with. Kept as a literal even though the
+// seed now uses the project address: any database seeded before that change still holds
+// this one, and this is the key used to find and rename that account. Freshly seeded
+// databases fall through to the branch below, which finds the new address and promotes it.
 const OLD_ADMIN_EMAIL = "admin@graze.app";
 
 async function main() {
@@ -36,7 +40,7 @@ async function main() {
   if (!newAdminEmail || !newAdminPassword) {
     console.error(
       "Set NEW_ADMIN_EMAIL and NEW_ADMIN_PASSWORD before running this script, e.g.:\n\n" +
-        "  NEW_ADMIN_EMAIL=you@example.com NEW_ADMIN_PASSWORD='a long random passphrase' npm run db:cleanup-demo\n",
+        "  NEW_ADMIN_EMAIL=grazeoutreach@gmail.com NEW_ADMIN_PASSWORD='a long random passphrase' npm run db:cleanup-demo\n",
     );
     process.exit(1);
   }
@@ -81,7 +85,8 @@ async function main() {
     console.log(`Removed ${users.count} demo account(s).`);
   }
 
-  // Replace the seeded admin login (admin@graze.app / password123) with a real one only
+  // Replace the seeded admin login (the demo password is published in the README) with a
+  // real one only
   // you know. The password is read from an environment variable you set in your own
   // terminal — it is never sent anywhere else.
   const passwordHash = await bcrypt.hash(newAdminPassword, 10);
