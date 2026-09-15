@@ -99,10 +99,17 @@ export default async function LiveResults({
   );
   const visible = ranked.results;
   const flaggedHeld = ranked.flaggedHeld;
+  const classificationFor = new Map(results.map((result, i) => [result, classified[i]]));
+
   // The badge UI still reads the older Assessment shape. Derived from the same facts here
   // rather than re-fetched, so the badge and the ranking are looking at one set of data —
   // migrating the badge to render classify()'s signal list directly is the next step.
   const credibility = new Map([...facts].map(([issn, record]) => [issn, assess(record)]));
+
+  // Aligned to the *displayed* order, since ranking reordered the page.
+  const classificationByResult = visible.map(
+    (result) => classificationFor.get(result) ?? null,
+  );
 
   // Glossaries already generated for any of these papers (by someone opening "Chew on
   // this" earlier) let cards underline jargon for free. One batched lookup keyed by DOI —
@@ -169,6 +176,7 @@ export default async function LiveResults({
         boards={fields.map((f) => ({ slug: f.slug, name: f.name }))}
         suggestionsByResult={suggestionsByResult}
         fieldTestedByResult={fieldTestedByResult}
+        classificationByResult={classificationByResult}
         isLoggedIn={!!viewer}
         boardedDois={boardedDois}
         termsByDoi={termsByDoi}

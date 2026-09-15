@@ -5,7 +5,14 @@ import type { ReliabilityStatus } from "@prisma/client";
 // exported from a client module fails at runtime — only components cross that boundary,
 // not plain functions. The cards are server-rendered, so this lives here.
 
-export type FieldTestedState = "TESTED" | "PARTIAL" | "UNCHECKED" | "FLAGGED" | "PREPRINT";
+export type FieldTestedState =
+  | "TESTED"
+  | "PARTIAL"
+  | "UNCHECKED"
+  /** Checks ran, nothing vouched, nothing was wrong. The unified classifier's middle tier. */
+  | "UNVERIFIED"
+  | "FLAGGED"
+  | "PREPRINT";
 
 export type FieldTestedBreakdown = {
   /** null when nothing has told us either way. */

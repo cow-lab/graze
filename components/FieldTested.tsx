@@ -20,6 +20,7 @@ import type { PostSource } from "@prisma/client";
 import type { Assessment } from "@/lib/credibility/assess";
 import type { FieldTestedBreakdown, FieldTestedState } from "@/lib/fieldTested";
 import Portal from "@/components/Portal";
+import type { CredibilityTier, Signal } from "@/lib/credibility/classify";
 
 // Field-Tested — the reliability check, as a thing with a name rather than a line of
 // metadata. A field in the academic sense, and the idiom for something proven in use.
@@ -75,6 +76,13 @@ const STATES: Record<
     meaning:
       "Either a retraction notice exists for this paper, or two sources disagree about its journal. It's shown rather than hidden, and it's queued for a person to look at — nothing here was resolved automatically.",
   },
+  UNVERIFIED: {
+    label: "Unverified",
+    tone: "border-border-strong bg-panel-2 text-fg-muted",
+    icon: CircleHelp,
+    meaning:
+      "The checks ran and nothing vouched for this journal, but nothing was wrong with it either. This is the ordinary state for a new, niche, or subscription journal — the indexes we check don't cover everything. It is not a mark against the work, and results here are never hidden or pushed down.",
+  },
   PREPRINT: {
     label: "Preprint",
     // Neutral rather than teal: teal means "Chew on this" everywhere else, and a preprint
@@ -94,6 +102,9 @@ export default function FieldTested({
   sourceName,
   size = "default",
   className = "",
+  signals,
+  tier,
+  isPreprint,
 }: {
   state: FieldTestedState;
   breakdown: FieldTestedBreakdown;
@@ -103,10 +114,33 @@ export default function FieldTested({
   sourceName?: string | null;
   size?: "default" | "compact";
   className?: string;
+  /**
+   * The signals that produced this classification, from lib/credibility/classify.ts. When
+   * present the panel lists exactly what fired instead of the fixed four checks, which is
+   * the difference between explaining a result and describing a procedure.
+   */
+  signals?: Signal[];
+  /**
+   * The unified classification. When given, the badge itself is derived from this rather
+   * than from `state` — otherwise the headline and the signal list below it are computed by
+   * two different classifiers and can contradict each other, which they did: a panel could
+   * say "its journal isn't listed in DOAJ" directly above a signal reading "Listed in DOAJ".
+   */
+  tier?: CredibilityTier;
+  isPreprint?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
-  const { label, tone, icon: Icon, meaning } = STATES[state];
+  const effectiveState: FieldTestedState = tier
+    ? tier === "FLAGGED"
+      ? "FLAGGED"
+      : isPreprint
+        ? "PREPRINT"
+        : tier === "VERIFIED"
+          ? "TESTED"
+          : "UNVERIFIED"
+    : state;
+  const { label, tone, icon: Icon, meaning } = STATES[effectiveState];
   const compact = size === "compact";
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -232,6 +266,10 @@ export default function FieldTested({
           >
             <p className="text-xs leading-relaxed text-fg">{meaning}</p>
 
+            {signals && signals.length > 0 ? (
+              <SignalList signals={signals} />
+            ) : (
+            <>
             <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-fg-muted">
               What was checked
             </p>
@@ -302,6 +340,8 @@ export default function FieldTested({
                 icon={Quote}
               />
             </ul>
+            </>
+            )}
 
             {journal && journal.indexes.length > 0 && (
               <>
@@ -348,6 +388,93 @@ export default function FieldTested({
         </Portal>
       )}
     </div>
+  );
+}
+
+// Renders exactly what fired, grouped by how much weight it was allowed to carry. The
+// grouping is shown rather than hidden: a reader who can see that a citation count sits
+// under "Context, which doesn't affect the result" has learned something about how to read
+// a credibility claim, which is the point of the whole feature.
+function SignalList({ signals }: { signals: Signal[] }) {
+  const decisive = signals.filter((s) => s.weight === 1);
+  const contributing = signals.filter((s) => s.weight === 2);
+  const context = signals.filter((s) => s.weight === 3);
+
+  return (
+    <>
+      {decisive.length > 0 && (
+        <SignalGroup
+          title="Checks that decide on their own"
+          note="A result here overrides everything else."
+          signals={decisive}
+        />
+      )}
+      {contributing.length > 0 && (
+        <SignalGroup
+          title="What was checked"
+          note="These move a paper between verified and unverified. None of them can flag it."
+          signals={contributing}
+        />
+      )}
+      {context.length > 0 && (
+        <SignalGroup
+          title="Context"
+          note="Shown so you can judge for yourself. Does not affect the result."
+          signals={context}
+        />
+      )}
+    </>
+  );
+}
+
+function SignalGroup({
+  title,
+  note,
+  signals,
+}: {
+  title: string;
+  note: string;
+  signals: Signal[];
+}) {
+  return (
+    <>
+      <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-fg-muted">{title}</p>
+      <p className="mt-0.5 text-[10px] leading-snug text-fg-muted">{note}</p>
+      <ul className="mt-1.5 flex flex-col gap-1.5">
+        {signals.map((signal) => {
+          const tone =
+            signal.direction === "positive"
+              ? "text-moss"
+              : signal.direction === "negative"
+                ? "text-rose"
+                : "text-fg-muted";
+          return (
+            <li key={signal.id} className="text-[11px] leading-snug">
+              <span className={`font-medium ${tone}`}>{signal.label}</span>
+              {signal.detail && (
+                <span className="mt-0.5 block text-fg-muted">{signal.detail}</span>
+              )}
+              <span className="mt-0.5 block font-mono text-[10px] text-fg-muted">
+                via {signal.source}
+                {signal.evidenceUrl && (
+                  <>
+                    {" · "}
+                    <a
+                      href={signal.evidenceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      evidence
+                    </a>
+                  </>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 
