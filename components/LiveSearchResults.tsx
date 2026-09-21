@@ -16,6 +16,7 @@ import FieldPicker, { type PickerSuggestion } from "@/components/FieldPicker";
 import FieldTested from "@/components/FieldTested";
 import type { Assessment } from "@/lib/credibility/assess";
 import type { LiveFieldTested } from "@/lib/liveFieldTested";
+import type { Classification } from "@/lib/credibility/classify";
 import type { LiveSearchResult } from "@/lib/liveSearch";
 import { buttonClass } from "@/lib/controls";
 
@@ -27,6 +28,7 @@ export default function LiveSearchResults({
   suggestionsByResult,
   credibility,
   fieldTestedByResult,
+  classificationByResult,
   isLoggedIn,
   boardedDois,
   termsByDoi,
@@ -43,6 +45,8 @@ export default function LiveSearchResults({
   // through the same policy The Combine uses at import time (lib/liveFieldTested.ts), so
   // Discover shows what's actually been checked instead of a placeholder.
   fieldTestedByResult: LiveFieldTested[];
+  /** The unified credibility classification per result, in displayed order. */
+  classificationByResult: (Classification | null)[];
   isLoggedIn: boolean;
   boardedDois: string[];
   // Glossaries already cached for these papers, keyed by DOI. Absent for anything nobody
@@ -59,6 +63,7 @@ export default function LiveSearchResults({
           suggestions={suggestionsByResult[i] ?? []}
           assessment={(result.issn && credibility[result.issn]) || null}
           fieldTested={fieldTestedByResult[i]}
+          classification={classificationByResult[i]}
           isLoggedIn={isLoggedIn}
           initialOnBoard={!!result.doi && boardedDois.includes(result.doi)}
           terms={(result.doi && termsByDoi[result.doi]) || []}
@@ -86,6 +91,7 @@ function ResultRow({
   suggestions,
   assessment,
   fieldTested,
+  classification,
   terms,
   isLoggedIn,
   initialOnBoard,
@@ -95,6 +101,7 @@ function ResultRow({
   suggestions: PickerSuggestion[];
   assessment: Assessment | null;
   fieldTested: LiveFieldTested;
+  classification: Classification | null;
   terms: GlossaryTerm[];
   isLoggedIn: boolean;
   initialOnBoard: boolean;
@@ -129,6 +136,9 @@ function ResultRow({
           size="compact"
           state={fieldTested.state}
           breakdown={fieldTested.breakdown}
+          signals={classification?.signals}
+          tier={classification?.tier}
+          isPreprint={classification?.isPreprint}
           journal={assessment}
         />
         <AccessBadge isOpenAccess={result.isOpenAccess} />

@@ -20,6 +20,7 @@ import type { PostSource } from "@prisma/client";
 import type { Assessment } from "@/lib/credibility/assess";
 import type { FieldTestedBreakdown, FieldTestedState } from "@/lib/fieldTested";
 import Portal from "@/components/Portal";
+import type { CredibilityTier, Signal } from "@/lib/credibility/classify";
 
 // Field-Tested — the reliability check, as a thing with a name rather than a line of
 // metadata. A field in the academic sense, and the idiom for something proven in use.
@@ -51,7 +52,7 @@ const STATES: Record<
     tone: "border-moss/40 bg-moss/10 text-moss",
     icon: BadgeCheck,
     meaning:
-      "Peer-reviewed, published in a DOAJ-listed journal, and carrying no retraction notice. That's a check on the journal and the paper's status — not a judgement of whether the paper is any good, which is still yours to make.",
+      "Peer-reviewed, no retraction on record, and corroborated by an index or by the authors' registered identities. That's a check on the paper's status — not a judgement of whether it's any good, which is still yours to make.",
   },
   PARTIAL: {
     label: "Partly checked",
@@ -75,6 +76,13 @@ const STATES: Record<
     meaning:
       "Either a retraction notice exists for this paper, or two sources disagree about its journal. It's shown rather than hidden, and it's queued for a person to look at — nothing here was resolved automatically.",
   },
+  UNVERIFIED: {
+    label: "Unverified",
+    tone: "border-border-strong bg-panel-2 text-fg-muted",
+    icon: CircleHelp,
+    meaning:
+      "Some of the checks couldn't be completed — often a missing DOI, or authors we couldn't resolve. Nothing was wrong with it. Results here are never hidden or pushed down.",
+  },
   PREPRINT: {
     label: "Preprint",
     // Neutral rather than teal: teal means "Chew on this" everywhere else, and a preprint
@@ -94,6 +102,9 @@ export default function FieldTested({
   sourceName,
   size = "default",
   className = "",
+  signals,
+  tier,
+  isPreprint,
 }: {
   state: FieldTestedState;
   breakdown: FieldTestedBreakdown;
@@ -103,10 +114,33 @@ export default function FieldTested({
   sourceName?: string | null;
   size?: "default" | "compact";
   className?: string;
+  /**
+   * The signals that produced this classification, from lib/credibility/classify.ts. When
+   * present the panel lists exactly what fired instead of the fixed four checks, which is
+   * the difference between explaining a result and describing a procedure.
+   */
+  signals?: Signal[];
+  /**
+   * The unified classification. When given, the badge itself is derived from this rather
+   * than from `state` — otherwise the headline and the signal list below it are computed by
+   * two different classifiers and can contradict each other, which they did: a panel could
+   * say "its journal isn't listed in DOAJ" directly above a signal reading "Listed in DOAJ".
+   */
+  tier?: CredibilityTier;
+  isPreprint?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
-  const { label, tone, icon: Icon, meaning } = STATES[state];
+  const effectiveState: FieldTestedState = tier
+    ? tier === "FLAGGED"
+      ? "FLAGGED"
+      : isPreprint
+        ? "PREPRINT"
+        : tier === "VERIFIED"
+          ? "TESTED"
+          : "UNVERIFIED"
+    : state;
+  const { label, tone, icon: Icon, meaning } = STATES[effectiveState];
   const compact = size === "compact";
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -232,6 +266,18 @@ export default function FieldTested({
           >
             <p className="text-xs leading-relaxed text-fg">{meaning}</p>
 
+            {signals && signals.length > 0 ? (
+              <>
+                <SignalList signals={signals} />
+                <a
+                  href="/how-we-check"
+                  className="mt-3 inline-block font-mono text-[10px] uppercase tracking-wide text-moss underline"
+                >
+                  How we check →
+                </a>
+              </>
+            ) : (
+            <>
             <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-fg-muted">
               What was checked
             </p>
@@ -302,8 +348,15 @@ export default function FieldTested({
                 icon={Quote}
               />
             </ul>
+            </>
+            )}
 
-            {journal && journal.indexes.length > 0 && (
+            {/* The older journal-level block. Everything in it — index states, fee
+                disclosure, citation context — is already in the signal list above, so
+                showing both duplicated each fact in different words and undid the point of
+                trimming the panel. Kept only for the call sites that don't pass signals
+                yet. */}
+            {!signals?.length && journal && journal.indexes.length > 0 && (
               <>
                 <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-fg-muted">
                   The journal
@@ -348,6 +401,65 @@ export default function FieldTested({
         </Portal>
       )}
     </div>
+  );
+}
+
+// Renders exactly what fired, grouped by how much weight it was allowed to carry. The
+// grouping is shown rather than hidden: a reader who can see that a citation count sits
+// under "Context, which doesn't affect the result" has learned something about how to read
+// a credibility claim, which is the point of the whole feature.
+function SignalList({ signals }: { signals: Signal[] }) {
+  const decisive = signals.filter((s) => s.weight === 1);
+  const contributing = signals.filter((s) => s.weight === 2);
+  const context = signals.filter((s) => s.weight === 3);
+
+  return (
+    <>
+      {decisive.length > 0 && (
+        <SignalGroup title="Decides on its own" signals={decisive} />
+      )}
+      {contributing.length > 0 && (
+        <SignalGroup title="What was checked" signals={contributing} />
+      )}
+      {context.length > 0 && (
+        <SignalGroup title="Context — doesn't affect the result" signals={context} />
+      )}
+    </>
+  );
+}
+
+function SignalGroup({ title, signals }: { title: string; signals: Signal[] }) {
+  return (
+    <>
+      <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-fg-muted">{title}</p>
+      <ul className="mt-1.5 flex flex-col gap-1">
+        {signals.map((signal) => {
+          const tone =
+            signal.direction === "positive"
+              ? "text-moss"
+              : signal.direction === "negative"
+                ? "text-rose"
+                : "text-fg-muted";
+          return (
+            <li key={signal.id} className="flex items-baseline justify-between gap-2 text-[11px] leading-snug">
+              <span className={tone}>{signal.label}</span>
+              {signal.evidenceUrl ? (
+                <a
+                  href={signal.evidenceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 font-mono text-[10px] text-fg-muted underline"
+                >
+                  {signal.source}
+                </a>
+              ) : (
+                <span className="shrink-0 font-mono text-[10px] text-fg-muted">{signal.source}</span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 }
 

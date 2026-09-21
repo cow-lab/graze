@@ -45,7 +45,7 @@ function toRelated(item: OpenAlexWork): RelatedPaper {
 export async function getRelatedPapers(doi: string, limit = 4): Promise<RelatedPaper[]> {
   try {
     const workRes = await fetchWithBackoff(
-      `https://api.openalex.org/works/doi:${encodeURIComponent(doi)}?mailto=graze-search@example.com`,
+      `https://api.openalex.org/works/doi:${encodeURIComponent(doi)}?mailto=grazeoutreach@gmail.com`,
     );
     if (!workRes.ok) return [];
     const work = (await workRes.json()) as OpenAlexWork;
@@ -60,7 +60,7 @@ export async function getRelatedPapers(doi: string, limit = 4): Promise<RelatedP
     const listUrl = new URL("https://api.openalex.org/works");
     listUrl.searchParams.set("filter", `openalex_id:${ids.join("|")}`);
     listUrl.searchParams.set("per-page", String(limit));
-    listUrl.searchParams.set("mailto", "graze-search@example.com");
+    listUrl.searchParams.set("mailto", "grazeoutreach@gmail.com");
 
     const listRes = await fetchWithBackoff(listUrl.toString());
     if (!listRes.ok) return [];

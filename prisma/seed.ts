@@ -37,11 +37,11 @@ async function main() {
   );
 
   await prisma.user.upsert({
-    where: { email: "admin@graze.app" },
+    where: { email: "admin@graze.local" },
     update: {},
     create: {
       name: "Site Admin",
-      email: "admin@graze.app",
+      email: "admin@graze.local",
       passwordHash,
       verified: true,
       role: "ADMIN",
@@ -910,7 +910,7 @@ async function main() {
   );
   console.log(`Demo login password for every seed user: ${DEMO_PASSWORD}`);
   console.log(
-    `Admin login: admin@graze.app / ${DEMO_PASSWORD} — see /admin/queue, /admin/fields, and try "Run The Combine now"`,
+    `Admin login: admin@graze.local / ${DEMO_PASSWORD} — see /admin/queue, /admin/fields, and try "Run The Combine now"`,
   );
 }
 

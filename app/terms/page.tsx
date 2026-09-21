@@ -15,8 +15,9 @@ export default function Terms() {
     >
       <h2>Who runs Graze</h2>
       <p>
-        Graze is operated by {OPERATOR_NAME}. It is free to use. Nothing on the site charges
-        money, there is no advertising, and your data is not sold. Contact:{" "}
+        {OPERATOR_NAME} is an independent, non-commercial project run by one person. It is
+        free to use: nothing on the site charges money, there is no advertising, and your
+        data is not sold. Contact:{" "}
         <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.
       </p>
 

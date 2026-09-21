@@ -22,7 +22,7 @@ export async function isIndexedInMedline(issn: string): Promise<boolean | null> 
     url.searchParams.set("term", `"${issn}"[ISSN] AND currentlyindexed[All Fields]`);
     url.searchParams.set("retmode", "json");
     url.searchParams.set("tool", "graze");
-    url.searchParams.set("email", "graze-credibility@example.com");
+    url.searchParams.set("email", "grazeoutreach@gmail.com");
 
     const res = await fetchWithBackoff(url.toString());
     if (!res.ok) return null;

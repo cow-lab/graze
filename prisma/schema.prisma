@@ -576,3 +576,53 @@ model CommentVote {
 
   @@unique([userId, commentId])
 }
+
+
+// ─── Predatory-list sync ────────────────────────────────────────────────────────────────
+//
+// The list is published as a Google Sheet, which exports clean CSV — a stable,
+// machine-readable endpoint rather than the HTML scrape it first appeared to be.
+//
+// It is matched by NAME, which is where the danger is: 343 of its ~2,780 entries are
+// single words, and many of those ("Acoustics", "Agronomy", "Aerospace", "AI") are also
+// the names of legitimate, DOAJ-listed journals. Matching those naively would hard-flag
+// and suppress real research. Entries are therefore marked ambiguous at sync time and can
+// never hard-flag on their own — see lib/credibility/sources/predatoryList.ts.
+
+enum PredatoryEntryKind {
+  JOURNAL
+  PUBLISHER
+}
+
+model PredatoryListEntry {
+  id   String             @id @default(cuid())
+  kind PredatoryEntryKind
+  /** As published, for display and evidence. */
+  name String
+  /** Lowercased, punctuation stripped, leading article removed. What matching compares. */
+  normalized String
+  /**
+   * True when the name is too generic to carry a hard flag by itself — a single token, or
+   * short enough to collide with an unrelated journal. These become CAUTION, not EXCLUDE.
+   */
+  ambiguous Boolean @default(false)
+  syncedAt  DateTime @default(now())
+
+  @@unique([kind, normalized])
+  @@index([normalized])
+}
+
+model PredatoryListSync {
+  id    String   @id @default(cuid())
+  ranAt DateTime @default(now())
+  /** False when a safety rail rejected the fetch and nothing was written. */
+  ok             Boolean
+  journalCount   Int
+  publisherCount Int
+  /** Net change in entries against the previous successful sync. */
+  delta   Int
+  /** Why it was rejected, or a summary of what changed. */
+  message String?
+
+  @@index([ranAt])
+}
