@@ -32,7 +32,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Every seeded user logs in with the password `password123` (see `prisma/seed.ts` for emails — e.g. `dana@quantcredit.io`). The seeded admin account is `grazeoutreach@gmail.com` / `password123` — see `/admin/queue`.
+Open [http://localhost:3000](http://localhost:3000). Every seeded user logs in with the password `password123` (see `prisma/seed.ts` for emails — e.g. `dana@quantcredit.io`). The seeded admin account is `admin@graze.local` / `password123` — see `/admin/queue`. These are local demo credentials only; `npm run db:cleanup-demo` replaces them with a real login before a deployment is used by anyone.
 
 ## Environment variables
 
@@ -203,7 +203,7 @@ Besides user uploads, the research library is populated automatically by a backg
 - Survivors get the same Claude-API/demo-mode explainer generation as user uploads, then **publish straight to the public feed and research library** — passing every check (DOAJ/allowlist-verified journal, not a duplicate, has a real abstract) is treated as "checked out," so nothing sits waiting on a person
 - Auto-imported posts show a small "Auto-imported from [source]" badge everywhere they appear, so they're never visually confused with something a person chose to post
 
-**`/admin/queue`** still exists (seeded admin: `grazeoutreach@gmail.com`) for anything a future, stricter check might flag for manual review, and its "Run The Combine now" button is the practical way to trigger an on-demand run — useful since the real schedule (`instrumentation.ts`) is a lightweight daily interval suited to a single long-running `npm run dev` process, not a substitute for a real scheduler (Vercel Cron, node-cron, etc.) in production. It intentionally doesn't fire on every server restart, to avoid hammering five external APIs every time you run `npm run dev`.
+**`/admin/queue`** still exists (seeded admin: `admin@graze.local`) for anything a future, stricter check might flag for manual review, and its "Run The Combine now" button is the practical way to trigger an on-demand run — useful since the real schedule (`instrumentation.ts`) is a lightweight daily interval suited to a single long-running `npm run dev` process, not a substitute for a real scheduler (Vercel Cron, node-cron, etc.) in production. It intentionally doesn't fire on every server restart, to avoid hammering five external APIs every time you run `npm run dev`.
 
 ## Library and Search are strictly separate
 
