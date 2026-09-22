@@ -101,9 +101,13 @@ async function generate(input: {
 
   const payload: ExplainerPayload = { ...explainer, isDemo };
 
-  // Only cacheable when there's a DOI to key on. Without one there's no stable identity,
-  // so this stays a per-click generation.
-  if (input.doi) {
+  // Only cacheable when there's a DOI to key on, and only when generation actually
+  // succeeded. Caching a demo explainer stores a failure permanently: the account ran out
+  // of API credits for an afternoon and 87 papers ended up with placeholder text saved
+  // against their DOI, still being served long after the credits were topped up. A
+  // placeholder is what we show when something is wrong right now — it is not a fact about
+  // the paper, so it doesn't belong in a cache keyed on the paper.
+  if (input.doi && !isDemo) {
     await prisma.researchExplainer.upsert({
       where: { doi: input.doi },
       update: {},

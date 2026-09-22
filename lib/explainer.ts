@@ -44,19 +44,35 @@ type ExplainerInput = {
   abstract: string;
 };
 
-function placeholderExplainer(input: ExplainerInput): Explainer {
+/**
+ * Why we're showing a placeholder. The message used to say "no ANTHROPIC_API_KEY is
+ * configured" for every case, including a key that was set and working but out of credits —
+ * which sent a real debugging session chasing environment variables for an hour when the
+ * answer was a billing page. Whatever the operator sees here should be the actual cause.
+ */
+type DemoReason = "no-key" | "api-error" | "bad-output";
+
+const REASON_TEXT: Record<DemoReason, string> = {
+  "no-key": "no ANTHROPIC_API_KEY is configured",
+  "api-error":
+    "the Claude API call failed — check the server logs for the reason, which is often billing credits rather than the key itself",
+  "bad-output": "the model's response didn't match the expected format",
+};
+
+function placeholderExplainer(input: ExplainerInput, reason: DemoReason = "no-key"): Explainer {
+  const why = REASON_TEXT[reason];
   return {
-    tldr: `Placeholder explainer for "${input.title}" — no ANTHROPIC_API_KEY is configured.`,
+    tldr: `Placeholder explainer for "${input.title}" — ${why}.`,
     keyFindings: [
-      "This is demo mode: no key is set, so nothing here was read from the paper's abstract.",
-      "Set ANTHROPIC_API_KEY to generate a real TL;DR, summary, and key findings.",
+      `This is demo mode — ${why} — so nothing here was read from the paper's abstract.`,
+      "Real explainers resume automatically once that's resolved; nothing needs redeploying.",
     ],
-    summary: `"${input.title}" is a ${input.field} paper by ${input.authors}. This is a placeholder explainer shown because no ANTHROPIC_API_KEY is configured — set one to generate a real plain-language summary, glossary, and comprehension check for this paper from its abstract.`,
+    summary: `"${input.title}" is a ${input.field} paper by ${input.authors}. This is a placeholder explainer shown because ${why} — resolve that to generate a real plain-language summary, glossary, and comprehension check for this paper from its abstract.`,
     terms: [
       {
         term: "Demo mode",
         definition:
-          "The app is running without a Claude API key, so explainers are generated as placeholders instead of from the actual abstract.",
+          `The app can't reach Claude right now (${why}), so explainers are placeholders instead of being written from the actual abstract.`,
       },
       {
         term: input.field || "Field",
@@ -67,7 +83,7 @@ function placeholderExplainer(input: ExplainerInput): Explainer {
       {
         question: "Why is this comprehension check generic instead of specific to the paper?",
         options: [
-          "No ANTHROPIC_API_KEY is set, so a placeholder explainer was used",
+          "Claude couldn't be reached, so a placeholder explainer was used",
           "The paper has no abstract",
           "The quiz feature is disabled for this board",
           "The paper was rejected",
@@ -77,7 +93,7 @@ function placeholderExplainer(input: ExplainerInput): Explainer {
       {
         question: "What should a site operator do to enable real explainers?",
         options: [
-          "Set the ANTHROPIC_API_KEY environment variable",
+          "Check the server logs for the cause — a missing key, or an API error such as exhausted credits",
           "Delete the paper and resubmit",
           "Nothing, this is expected behavior",
           "Contact the paper's authors",
@@ -98,7 +114,7 @@ export async function generateExplainer(
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    return { explainer: placeholderExplainer(input), isDemo: true, usage: ZERO_USAGE };
+    return { explainer: placeholderExplainer(input, "no-key"), isDemo: true, usage: ZERO_USAGE };
   }
 
   try {
@@ -126,13 +142,15 @@ export async function generateExplainer(
 
     if (!response.parsed_output) {
       console.error("Explainer generation: model output failed schema validation");
-      return { explainer: placeholderExplainer(input), isDemo: true, usage };
+      return { explainer: placeholderExplainer(input, "bad-output"), isDemo: true, usage };
     }
 
     return { explainer: response.parsed_output, isDemo: false, usage };
   } catch (err) {
+    // Logged in full: the API's own message names the cause (credit balance, rate limit,
+    // invalid key), and that is the thing an operator actually needs to see.
     console.error("Explainer generation failed, falling back to demo mode:", err);
-    return { explainer: placeholderExplainer(input), isDemo: true, usage: ZERO_USAGE };
+    return { explainer: placeholderExplainer(input, "api-error"), isDemo: true, usage: ZERO_USAGE };
   }
 }
 
