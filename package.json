@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
-    "db:cleanup-demo": "tsx prisma/cleanup-demo-data.ts"
+    "db:cleanup-demo": "tsx prisma/cleanup-demo-data.ts",
+    "db:backfill-explainers": "tsx prisma/backfill-explainers.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
