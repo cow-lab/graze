@@ -8,11 +8,18 @@ const ExplainerSchema = z.object({
   summary: z.string(),
   // Deliberately separate from the summary. The summary says what the paper is about; these
   // say what it actually found — the part a reader needs in order to disagree with it.
-  keyFindings: z.array(z.string()).min(2).max(3),
+  //
+  // The upper bounds here and below are deliberately looser than what the prompt asks for.
+  // They were set to the exact numbers requested (3 findings, 3 questions), which meant a
+  // model returning a fourth perfectly good finding failed schema validation and the whole
+  // generation was discarded — 8 of 66 papers in one backfill, each one a wasted API call
+  // and a paper left with no explainer at all. The prompt still asks for 2-3; the schema
+  // just no longer treats one extra as a reason to throw the result away.
+  keyFindings: z.array(z.string()).min(2).max(5),
   terms: z
     .array(z.object({ term: z.string(), definition: z.string() }))
     .min(2)
-    .max(4),
+    .max(6),
   quiz: z
     .array(
       z.object({
@@ -22,7 +29,7 @@ const ExplainerSchema = z.object({
       }),
     )
     .min(2)
-    .max(3),
+    .max(5),
 });
 
 export type Explainer = z.infer<typeof ExplainerSchema>;
